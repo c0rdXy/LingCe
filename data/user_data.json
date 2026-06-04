@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "last_file": "D:/AI/Code/LingCe/data/题库.json",
+  "theme": "light",
+  "progress": {
+    "D:/AI/Code/LingCe/data/题库.json": {
+      "current_index": 1,
+      "selected_type": "all",
+      "correct_count": 0,
+      "answered_count": 0
+    }
+  },
+  "wrong_history": [],
+  "favorites": [],
+  "tags": {},
+  "stats": {
+    "total_answered": 0,
+    "total_correct": 0,
+    "daily": {}
+  },
+  "last_updated": "2026-06-04T17:22:12.961121",
+  "wrong_history_full": {},
+  "favorites_full": {
+    "D:/AI/Code/LingCe/data/题库.json": []
+  }
+}

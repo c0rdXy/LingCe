@@ -1,0 +1,7 @@
+﻿# 灵测 LingCe V0.0.1
+# 当前仅使用 Python 标准库 (tkinter, json, pathlib, ...)
+#
+# 可选依赖（用于统计图表功能）:
+# matplotlib>=3.5
+#
+# 开发依赖: pip install -e ".[dev]"

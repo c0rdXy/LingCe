@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lingce"
+version = "0.0.1"
+description = "灵测 LingCe — 通用考试练习系统"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.7"
+authors = [
+    { name = "LingCe contributors" },
+]
+keywords = ["exam", "quiz", "practice", "training", "lingce", "flextest"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Topic :: Education :: Computer Aided Instruction",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: X11 Applications :: Tk",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+chart = ["matplotlib>=3.5"]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+
+[project.scripts]
+lingce = "app:main"
+
+[tool.setuptools.packages.find]
+include = ["core*", "services*", "ui*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+
