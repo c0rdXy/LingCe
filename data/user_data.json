@@ -4,7 +4,7 @@
   "theme": "light",
   "progress": {
     "D:/AI/Code/LingCe/data/题库.json": {
-      "current_index": 1,
+      "current_index": 986,
       "selected_type": "all",
       "correct_count": 0,
       "answered_count": 0
@@ -18,7 +18,7 @@
     "total_correct": 0,
     "daily": {}
   },
-  "last_updated": "2026-06-04T17:22:12.961121",
+  "last_updated": "2026-06-05T10:06:30.611886",
   "wrong_history_full": {},
   "favorites_full": {
     "D:/AI/Code/LingCe/data/题库.json": []

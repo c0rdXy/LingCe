@@ -60,9 +60,8 @@ class MainWindow:
         """设置窗口属性"""
         self.root.title(WINDOW_TITLE)
         self.root.geometry(DEFAULT_WINDOW_SIZE)
+        center_window(self.root, 1100, 750)
         self._apply_theme()
-        # 延迟居中：等窗口布局完成后再计算位置，确保尺寸准确
-        self.root.after(150, lambda: center_window(self.root, 1100, 750))
 
     def _apply_theme(self):
         """应用当前主题到窗口"""
