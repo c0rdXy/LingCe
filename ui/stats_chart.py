@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 统计图表面板 — 支持 matplotlib（可选）和 tkinter Canvas 两种渲染方式

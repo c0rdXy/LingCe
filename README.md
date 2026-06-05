@@ -1,4 +1,4 @@
-﻿# 灵测 LingCe
+# 灵测 LingCe
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
