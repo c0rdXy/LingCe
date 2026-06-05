@@ -400,29 +400,24 @@ def show_message_dialog(title: str, message: str, dialog_type: str = "info"):
         return messagebox.askyesno(title, message)
 
 
-def _get_work_rect():
-    # 获取屏幕可用工作区（排除任务栏）
+def center_window(window, width, height):
     import sys
+    sh = window.winfo_screenheight()
+    sw = window.winfo_screenwidth()
+
+    # Windows: 用工作区高度替代全屏高度
     if sys.platform == "win32":
         try:
             import ctypes
             class RECT(ctypes.Structure):
-                _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
-                            ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+                _fields_ = [("l", ctypes.c_long), ("t", ctypes.c_long),
+                            ("r", ctypes.c_long), ("b", ctypes.c_long)]
             rect = RECT()
             ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(rect), 0)
-            return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
+            sh = rect.b - rect.t
         except Exception:
             pass
-    return 0, 0, None, None
-
-
-def center_window(window, width, height):
-    wa_x, wa_y, wa_w, wa_h = _get_work_rect()
-    sw = wa_w or window.winfo_screenwidth()
-    sh = wa_h or window.winfo_screenheight()
 
     x = (sw - width) // 2
-    y = wa_y + sh - height  # 底部紧贴任务栏
-
+    y = (sh - height) // 2 - 26
     window.geometry(f"{width}x{height}+{x}+{y}")
