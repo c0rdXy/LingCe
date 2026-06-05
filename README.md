@@ -8,8 +8,6 @@
 
 支持自定义 JSON 题库、练习与考试双模式、错题集管理、学习统计，适用于各类考试备考场景。
 
-**English** | [简体中文](#)
-
 ---
 
 ## ✨ 功能特性
@@ -34,33 +32,31 @@
 
 ## 🚀 快速开始
 
-### 运行
-
-`ash
-git clone https://github.com/<your-username>/LingCe.git
+```bash
+git clone https://github.com/c0rdXy/LingCe.git
 cd LingCe
 python app.py
-`
+```
 
 > 需要 Python 3.7+，tkinter 通常随 Python 自带。
 
 ### 开发安装
 
-`ash
+```bash
 pip install -e ".[dev]"
 pytest
-`
+```
 
 ### 打包构建
 
-`ash
+```bash
 pip install pyinstaller
 python secure_build.py
-`
+```
 
 ## 📁 项目结构
 
-`
+```
 LingCe/
 ├── app.py                  # 主程序入口
 ├── core/
@@ -85,7 +81,7 @@ LingCe/
 ├── tests/                  # 单元测试（92 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
-`
+```
 
 ## ⌨️ 快捷键
 
@@ -102,7 +98,7 @@ LingCe/
 
 题库为标准 JSON 数组格式，示例：
 
-``json
+```json
 [
   {
     "id": 1,
@@ -113,7 +109,7 @@ LingCe/
     "explanation": "解析说明"
   }
 ]
-``
+```
 
 支持 `single` / `multiple` / `judgement` / `fill` / `short` 五种题型。
 
@@ -136,9 +132,9 @@ LingCe/
 
 提交前请确保通过全部测试：
 
-`ash
+```bash
 pytest
-`
+```
 
 ## 📄 许可证
 
