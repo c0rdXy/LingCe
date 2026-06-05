@@ -47,6 +47,9 @@ class UserDataService:
         with open(self.data_file, "w", encoding="utf-8") as f:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
+    def reload(self):
+        self._load()
+
     @staticmethod
     def _default_data() -> Dict[str, Any]:
         return {
@@ -199,11 +202,19 @@ class UserDataService:
             "daily": {},
         })
 
-    def update_stats(self, answered: int, correct: int):
-        """更新累计统计"""
+    def update_stats(self, answered: int, correct: int, mode: str = "practice"):
+        """更新累计统计，支持按模式分别记录"""
         stats = self.get_stats()
         stats["total_answered"] = stats.get("total_answered", 0) + answered
         stats["total_correct"] = stats.get("total_correct", 0) + correct
+
+        # 按模式统计
+        mode_stats = stats.get("by_mode", {})
+        mode_data = mode_stats.get(mode, {"answered": 0, "correct": 0})
+        mode_data["answered"] = mode_data.get("answered", 0) + answered
+        mode_data["correct"] = mode_data.get("correct", 0) + correct
+        mode_stats[mode] = mode_data
+        stats["by_mode"] = mode_stats
 
         # 按日统计
         today = datetime.now().strftime("%Y-%m-%d")

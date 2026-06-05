@@ -14,8 +14,9 @@ from core.config import (
 )
 from services.file_service import FileService
 from services.user_data_service import UserDataService
+from services.exam_db import init_db
 from ui.components import show_message_dialog, center_window
-from ui.stats_chart import show_stats_chart
+from ui.exam_stats import show_exam_stats
 
 
 class MainWindow:
@@ -23,6 +24,7 @@ class MainWindow:
 
     def __init__(self, root: tk.Tk):
         self.root = root
+        init_db()
         self.file_service = FileService()
         self.user_data = UserDataService()
         self.current_mode = None
@@ -298,88 +300,8 @@ class MainWindow:
 
     def show_stats_panel(self):
         """显示统计面板（图表）"""
-        show_stats_chart(self.root, self.user_data)
+        show_exam_stats(self.root)
         return
-
-        # 以下是备用的纯文本面板
-        stats = self.user_data.get_stats()
-        daily = self.user_data.get_daily_stats(30)
-
-        panel = tk.Toplevel(self.root)
-        panel.title("学习统计")
-        panel.geometry("700x550")
-        center_window(panel, 700, 550)
-
-        tc = get_theme_colors()
-
-        # 累计统计
-        summary = tk.Frame(panel, bg=tc["card_bg"], relief="solid", bd=1)
-        summary.pack(fill="x", padx=20, pady=15)
-
-        total_a = stats.get("total_answered", 0)
-        total_c = stats.get("total_correct", 0)
-        accuracy = (total_c / total_a * 100) if total_a > 0 else 0
-
-        for text in [
-            f"累计答题: {total_a} 题",
-            f"累计正确: {total_c} 题",
-            f"总正确率: {accuracy:.1f}%",
-            f"错题总数: {len(self.wrong_questions_history)} 题",
-        ]:
-            tk.Label(summary, text=text, font=get_font(12),
-                     bg=tc["card_bg"], fg=tc["text"]).pack(anchor="w", padx=15, pady=3)
-
-        # 每日统计表
-        if daily:
-            daily_frame = tk.LabelFrame(panel, text="每日统计", font=BOLD_FONT,
-                                        bg=tc["bg"])
-            daily_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-
-            # 表头
-            header = tk.Frame(daily_frame, bg=tc["bg"])
-            header.pack(fill="x", padx=10, pady=5)
-            tk.Label(header, text="日期", font=BOLD_FONT, bg=tc["bg"],
-                     width=15, anchor="w").pack(side="left")
-            tk.Label(header, text="答题数", font=BOLD_FONT, bg=tc["bg"],
-                     width=10).pack(side="left")
-            tk.Label(header, text="正确数", font=BOLD_FONT, bg=tc["bg"],
-                     width=10).pack(side="left")
-            tk.Label(header, text="正确率", font=BOLD_FONT, bg=tc["bg"],
-                     width=10).pack(side="left")
-
-            # Canvas + Scrollbar
-            canvas = tk.Canvas(daily_frame, bg=tc["bg"])
-            scrollbar = ttk.Scrollbar(daily_frame, orient="vertical", command=canvas.yview)
-            scroll_frame = tk.Frame(canvas, bg=tc["bg"])
-            scroll_frame.bind("<Configure>",
-                              lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-            canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
-            canvas.pack(side="left", fill="both", expand=True, padx=10)
-            scrollbar.pack(side="right", fill="y")
-
-            for date, data in daily.items():
-                row = tk.Frame(scroll_frame, bg=tc["bg"])
-                row.pack(fill="x", pady=1)
-                a = data.get("answered", 0)
-                c = data.get("correct", 0)
-                acc = (c / a * 100) if a > 0 else 0
-                tk.Label(row, text=date, font=DEFAULT_FONT, bg=tc["bg"],
-                         width=15, anchor="w").pack(side="left")
-                tk.Label(row, text=str(a), font=DEFAULT_FONT, bg=tc["bg"],
-                         width=10).pack(side="left")
-                tk.Label(row, text=str(c), font=DEFAULT_FONT, bg=tc["bg"],
-                         width=10).pack(side="left")
-                acc_color = tc["correct_fg"] if acc >= 60 else tc["wrong_fg"]
-                tk.Label(row, text=f"{acc:.1f}%", font=DEFAULT_FONT, bg=tc["bg"],
-                         fg=acc_color, width=10).pack(side="left")
-
-        ttk.Button(panel, text="关闭", command=panel.destroy).pack(pady=10)
-
-    # ------------------------------------------------------------------ #
-    #  帮助
-    # ------------------------------------------------------------------ #
-
     def show_help(self):
         help_text = """
 灵测 LingCe 使用说明

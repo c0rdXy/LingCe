@@ -32,3 +32,6 @@ Desktop.ini
 # Project specific
 2-安全打包版本/*.exe
 3-题库文件/*.zip
+
+# User data
+data/exam_history.db

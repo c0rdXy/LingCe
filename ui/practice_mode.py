@@ -609,7 +609,7 @@ class PracticeModeWindow:
                 self.record_wrong_answer()
 
             # 更新累计统计
-            self.user_data.update_stats(1, 1 if result.get('is_correct') else 0)
+            self.user_data.update_stats(1, 1 if result.get('is_correct') else 0, "practice")
 
             # 更新统计显示
             self.update_statistics_display()

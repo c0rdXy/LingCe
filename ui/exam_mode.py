@@ -15,6 +15,8 @@ from typing import Optional, Dict, Any, List
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_font
 from core.models import QuestionBank, Question
 from services.exam_service import ExamService
+from services.user_data_service import UserDataService
+from services.exam_db import save_exam_record, init_db
 from ui.components import show_message_dialog
 from ui.widgets import QuestionWidget, get_question_type_name
 
@@ -548,6 +550,12 @@ class ExamModeWindow:
             # short/essay 不自动评分
 
         total_score = single_score + multiple_score
+
+        save_exam_record(total_score, len(self.exam_questions), correct_count)
+        # 更新累计统计
+        total_answered = sum(1 for q in self.exam_questions if q.type in ("single", "multiple", "judge", "judgement"))
+        user_data = UserDataService()
+        user_data.update_stats(total_answered, correct_count, mode="exam")
 
         # 记录错题
         if wrong_questions and self.on_wrong_questions:
