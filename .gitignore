@@ -31,6 +31,7 @@ Desktop.ini
 
 # Project specific
 2-安全打包版本/*.exe
+dist_secure/
 3-题库文件/*.zip
 
 # User data

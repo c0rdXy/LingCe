@@ -15,8 +15,8 @@ from pathlib import Path
 class SecureBuild:
     def __init__(self):
         self.root_dir = Path(__file__).parent
-        self.source_dir = self.root_dir / "1-源码版本"
-        self.secure_dir = self.root_dir / "2-安全打包版本"
+        self.source_dir = self.root_dir
+        self.secure_dir = self.root_dir / "dist_secure"
         
     def clean_old_files(self):
         """清理旧的打包文件"""
@@ -32,6 +32,7 @@ class SecureBuild:
                         item.unlink(missing_ok=True)
         
         # 清理安全打包目录的exe文件
+        self.secure_dir.mkdir(exist_ok=True)
         for exe_file in self.secure_dir.glob("*.exe"):
             exe_file.unlink(missing_ok=True)
             
@@ -242,6 +243,7 @@ if __name__ == "__main__":
     def build_secure_exe(self):
         """构建安全的exe文件"""
         print("🚀 开始安全打包...")
+        self.secure_dir.mkdir(exist_ok=True)
         
         # 切换到源码目录
         os.chdir(self.source_dir)

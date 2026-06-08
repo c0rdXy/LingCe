@@ -9,6 +9,7 @@ import json
 
 from core.models import Question, QuestionBank
 from services.exam_service import ExamService
+from services.file_service import FileService
 from services.user_data_service import UserDataService
 
 
@@ -81,6 +82,14 @@ class TestExamService(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.submit_exam()
 
+    def test_get_exam_result_after_submit(self):
+        self.service.start_exam_session(question_count=10)
+        for q in self.service.exam_session.questions:
+            self.service.save_answer(q.id, "A")
+        submitted = self.service.submit_exam()
+        result = self.service.get_exam_result()
+        self.assertEqual(result, submitted)
+
     def test_get_answer_status(self):
         self.service.start_exam_session(question_count=10)
         q = self.service.get_current_question()
@@ -117,6 +126,24 @@ class TestExamService(unittest.TestCase):
         self.service.start_exam_session(question_count=10, time_limit=90)
         remaining = self.service.get_remaining_time()
         self.assertGreater(remaining, 0)
+
+
+class TestFileService(unittest.TestCase):
+    """FileService 娴嬭瘯"""
+
+    def test_validate_accepts_supported_question_types(self):
+        service = FileService()
+        data = [
+            {"type": "single", "question": "Q1", "options": ["A. X", "B. Y"], "answer": "A"},
+            {"type": "multiple", "question": "Q2", "options": ["A. X", "B. Y"], "answer": "AB"},
+            {"type": "judge", "question": "Q3", "answer": "A"},
+            {"type": "judgement", "question": "Q4", "answer": "A"},
+            {"type": "fill", "question": "Q5", "answer": "X"},
+            {"type": "short", "question": "Q6", "answer": "X"},
+            {"type": "essay", "question": "Q7", "answer": "X"},
+        ]
+
+        self.assertEqual(service.validate_question_data(data), [])
 
 
 class TestUserDataService(unittest.TestCase):

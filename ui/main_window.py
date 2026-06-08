@@ -43,8 +43,6 @@ class MainWindow:
         self.create_main_interface()
 
         # 尝试自动加载上次题库
-        self._try_auto_load()
-
     def _try_auto_load(self):
         """自动加载上次打开的题库"""
         last_file = self.user_data.get_last_file()
@@ -52,7 +50,7 @@ class MainWindow:
             from pathlib import Path
             if Path(last_file).exists():
                 try:
-                    self.file_service.load_question_bank(last_file)
+                    self.file_service.load_question_bank(last_file, show_messages=False)
                     self.update_question_bank_info(self.file_service.question_bank)
                     self.enable_function_buttons()
                 except Exception:

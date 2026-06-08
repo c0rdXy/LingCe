@@ -17,7 +17,7 @@ from core.models import QuestionBank, Question
 from services.exam_service import ExamService
 from services.user_data_service import UserDataService
 from services.exam_db import save_exam_record, init_db
-from ui.components import show_message_dialog
+from ui.components import show_message_dialog, center_window
 from ui.widgets import QuestionWidget, get_question_type_name
 
 
@@ -596,7 +596,7 @@ class ExamModeWindow:
 
         result_window = tk.Toplevel(self.root)
         result_window.title("考试结果")
-        result_window.geometry("550x600")
+        center_window(result_window, 550, 600)
         result_window.transient(self.root)
         result_window.grab_set()
 

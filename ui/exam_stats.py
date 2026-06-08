@@ -5,17 +5,24 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei"]
-plt.rcParams["axes.unicode_minus"] = False
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-
 from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors
 from ui.components import center_window
 from services.exam_db import query_by_date, query_all, get_daily_avg
+
+
+def _load_matplotlib():
+    try:
+        import matplotlib
+        matplotlib.use("TkAgg")
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+        from matplotlib.figure import Figure
+    except Exception:
+        return None
+
+    plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei"]
+    plt.rcParams["axes.unicode_minus"] = False
+    return Figure, FigureCanvasTkAgg
 
 
 class ExamStatsPanel:
@@ -132,6 +139,18 @@ class ExamStatsPanel:
                      font=get_font(14), bg=self.bg, fg=self.fg).pack(expand=True)
             return
 
+        chart_lib = _load_matplotlib()
+        if chart_lib is None:
+            tk.Label(
+                self.chart_inner,
+                text="\u672a\u5b89\u88c5 matplotlib\uff0c\u6682\u65e0\u6cd5\u663e\u793a\u8d8b\u52bf\u56fe",
+                font=get_font(12),
+                bg=self.bg,
+                fg=self.fg,
+            ).pack(expand=True)
+            return
+
+        Figure, FigureCanvasTkAgg = chart_lib
         tc = get_theme_colors()
         fig = Figure(figsize=(8, 3.5), dpi=100, facecolor=tc["bg"])
         ax = fig.add_subplot(111)

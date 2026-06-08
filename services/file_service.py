@@ -20,7 +20,7 @@ class FileService:
         self.current_file_path: Optional[str] = None
         self.question_bank: Optional[QuestionBank] = None
     
-    def load_question_bank(self, file_path: Optional[str] = None) -> Optional[QuestionBank]:
+    def load_question_bank(self, file_path: Optional[str] = None, show_messages: bool = True) -> Optional[QuestionBank]:
         """加载题库文件"""
         try:
             if not file_path:
@@ -35,11 +35,13 @@ class FileService:
             self.question_bank = load_questions_from_file(file_path)
             self.current_file_path = file_path
             
-            messagebox.showinfo("成功", f"成功加载 {len(self.question_bank.questions)} 道题目")
+            if show_messages:
+                messagebox.showinfo("成功", f"成功加载 {len(self.question_bank.questions)} 道题目")
             return self.question_bank
             
         except Exception as e:
-            messagebox.showerror("错误", f"加载题库失败：{str(e)}")
+            if show_messages:
+                messagebox.showerror("错误", f"加载题库失败：{str(e)}")
             return None
     
     def save_question_bank(self, question_bank: QuestionBank, file_path: Optional[str] = None) -> bool:
@@ -116,7 +118,7 @@ class FileService:
             
             if 'type' not in item:
                 errors.append(f"第{question_num}题：缺少题目类型")
-            elif item['type'] not in ['single', 'multiple', 'judge', 'short']:
+            elif item['type'] not in ['single', 'multiple', 'judge', 'judgement', 'fill', 'short', 'essay']:
                 errors.append(f"第{question_num}题：题目类型无效")
             
             if 'answer' not in item or not item['answer'].strip():

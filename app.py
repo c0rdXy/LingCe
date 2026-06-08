@@ -4,11 +4,28 @@
 应用主控制器 - 协调各个模块的交互
 """
 
-import tkinter as tk
+import sys
 from typing import Optional
 from core.models import QuestionBank
 
-# 不设置 DPI 感知，让 Windows 自动处理缩放
+
+def _enable_windows_dpi_awareness():
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        # PROCESS_SYSTEM_DPI_AWARE keeps Tk and Win32 geometry in physical pixels.
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
+_enable_windows_dpi_awareness()
+
+import tkinter as tk
 from ui.main_window import MainWindow
 from ui.practice_mode import PracticeModeWindow
 from ui.exam_mode import ExamModeWindow
@@ -20,6 +37,11 @@ class QuizApplication:
     
     def __init__(self):
         self.root = tk.Tk()
+        self.root.withdraw()
+        try:
+            self.root.attributes("-alpha", 0)
+        except Exception:
+            pass
         self.current_window = None
         self.question_bank: Optional[QuestionBank] = None
         
@@ -31,6 +53,24 @@ class QuizApplication:
         )
         
         self.current_window = self.main_window
+        self.root.after_idle(self._show_main_window)
+
+    def _show_main_window(self):
+        from ui.components import center_window
+
+        self.root.deiconify()
+        center_window(self.root, 1100, 750)
+        self.root.after(50, self._finish_startup)
+
+    def _finish_startup(self):
+        from ui.components import center_window
+
+        center_window(self.root, 1100, 750)
+        try:
+            self.root.attributes("-alpha", 1)
+        except Exception:
+            pass
+        self.root.after(100, self.main_window._try_auto_load)
     
     def start_practice_mode(self, question_bank: QuestionBank):
         """启动练习模式"""

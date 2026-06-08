@@ -7,7 +7,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext, filedialog
 from pathlib import Path
-from ui.components import show_message_dialog
+from ui.components import show_message_dialog, center_window
 from core.config import get_font
 
 
@@ -19,7 +19,7 @@ def create_edit_interface(parent_window, current_question, type_var_callback, fo
     # 创建独立的编辑窗口
     edit_window = tk.Toplevel(parent_window)
     edit_window.title("编辑题目")
-    edit_window.geometry("800x700")
+    center_window(edit_window, 800, 700)
     edit_window.transient(parent_window)
     edit_window.grab_set()
     

@@ -32,10 +32,13 @@ class TestQuestion(unittest.TestCase):
 
     def test_is_judge(self):
         self.assertTrue(self.judge.is_judge())
+        self.assertTrue(Question(id=5, type="judgement", question="True?").is_judge())
         self.assertFalse(self.single.is_judge())
 
     def test_is_short_answer(self):
         self.assertTrue(self.short.is_short_answer())
+        self.assertTrue(Question(id=5, type="fill", question="Blank?").is_short_answer())
+        self.assertTrue(Question(id=6, type="essay", question="Explain?").is_short_answer())
         self.assertFalse(self.single.is_short_answer())
 
     def test_get_correct_options_single(self):

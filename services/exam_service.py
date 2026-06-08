@@ -18,6 +18,7 @@ class ExamService:
     def __init__(self):
         self.question_bank: Optional[QuestionBank] = None
         self.exam_session: Optional[ExamSession] = None
+        self._last_result: Optional[Dict[str, Any]] = None
     
     def set_question_bank(self, question_bank: QuestionBank):
         """设置题库"""
@@ -42,6 +43,7 @@ class ExamService:
             start_time=datetime.now(),
             time_limit=time_limit
         )
+        self._last_result = None
         
         # 初始化答案记录
         for question in exam_questions:
@@ -146,7 +148,7 @@ class ExamService:
         total_questions = len(self.exam_session.questions)
         score = (correct_count / total_questions * 100) if total_questions > 0 else 0
         
-        return {
+        self._last_result = {
             "score": round(score, 1),
             "correct_count": correct_count,
             "total_questions": total_questions,
@@ -155,13 +157,14 @@ class ExamService:
             "pass_score": EXAM_CONFIG["pass_score"],
             "is_passed": score >= EXAM_CONFIG["pass_score"]
         }
+        return self._last_result
     
     def get_exam_result(self) -> Optional[Dict[str, Any]]:
         """获取考试结果"""
         if not self.exam_session or not self.exam_session.is_submitted:
             return None
         
-        return self.submit_exam()
+        return self._last_result
     
     def get_question_result(self, question_id: int) -> Optional[Dict[str, Any]]:
         """获取单题结果"""

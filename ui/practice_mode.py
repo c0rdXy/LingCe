@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, Callable
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES
 from core.models import QuestionBank, Question
 from services.question_service import QuestionService
-from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog
+from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog, center_window
 from ui.widgets import get_question_type_name
 from services.user_data_service import UserDataService
 from ui.edit_functions import create_edit_interface, update_answer_format_hint, save_edit_changes, save_question_bank_to_file
@@ -312,6 +312,7 @@ class PracticeModeWindow:
         """开始练习会话"""
         try:
             self.question_service.start_practice_session(question_type, self._collected_only)
+            self._restore_progress(question_type)
             self.show_current_question()
     
             self._update_fav_button()
@@ -617,6 +618,7 @@ class PracticeModeWindow:
             # 自动显示答案和结果，但保持用户选择状态
             self.question_service.toggle_answer_display()
             self.show_answer_with_result(user_answer, result)
+            self._save_progress()
             
         except Exception as e:
             show_message_dialog("错误", f"提交答案失败：{str(e)}", "error")
@@ -725,7 +727,7 @@ class PracticeModeWindow:
         """显示搜索结果"""
         result_window = tk.Toplevel(self.root)
         result_window.title(f"搜索结果 - '{keyword}'")
-        result_window.geometry("800x600")
+        center_window(result_window, 800, 600)
         
         # 结果列表
         frame = tk.Frame(result_window)
@@ -941,16 +943,21 @@ class PracticeModeWindow:
         self.user_data.save_progress(self.file_path, {
             "current_index": stats.get("current_index", 1) - 1,
             "selected_type": stats.get("selected_type", "all"),
+            "collected_only": self._collected_only,
             "correct_count": stats.get("correct_count", 0),
             "answered_count": stats.get("answered_count", 0),
         })
 
-    def _restore_progress(self):
+    def _restore_progress(self, question_type: str):
         """恢复练习进度"""
         if not self.file_path:
             return
         progress = self.user_data.get_progress(self.file_path)
         if progress:
+            if progress.get("selected_type", "all") != question_type:
+                return
+            if progress.get("collected_only", False) != self._collected_only:
+                return
             # 恢复统计
             session = self.question_service.practice_session
             if session:

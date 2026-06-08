@@ -400,24 +400,73 @@ def show_message_dialog(title: str, message: str, dialog_type: str = "info"):
         return messagebox.askyesno(title, message)
 
 
-def center_window(window, width, height):
+def _center_window_now(window, width, height):
     import sys
-    sh = window.winfo_screenheight()
-    sw = window.winfo_screenwidth()
+    scaled_width = width
+    scaled_height = height
 
-    # Windows: 用工作区高度替代全屏高度
+    work_x = 0
+    work_y = 0
+    work_w = window.winfo_screenwidth()
+    work_h = window.winfo_screenheight()
+    outer_w = scaled_width
+    outer_h = scaled_height
+
+    # Windows: center the decorated outer window, not just Tk's client area.
     if sys.platform == "win32":
         try:
             import ctypes
+
             class RECT(ctypes.Structure):
                 _fields_ = [("l", ctypes.c_long), ("t", ctypes.c_long),
                             ("r", ctypes.c_long), ("b", ctypes.c_long)]
-            rect = RECT()
-            ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(rect), 0)
-            sh = rect.b - rect.t
-        except Exception:
-            pass
 
-    x = (sw - width) // 2
-    y = (sh - height) // 2 - 26
-    window.geometry(f"{width}x{height}+{x}+{y}")
+            work_rect = RECT()
+            ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(work_rect), 0)
+            work_x = work_rect.l
+            work_y = work_rect.t
+            work_w = work_rect.r - work_rect.l
+            work_h = work_rect.b - work_rect.t
+
+            hwnd = window.winfo_id()
+            try:
+                dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
+            except Exception:
+                dpi = ctypes.windll.user32.GetDpiForSystem()
+            scale = dpi / 96
+            scaled_width = int(round(width * scale))
+            scaled_height = int(round(height * scale))
+            max_width = max(width, work_w - 40)
+            max_height = max(height, work_h - 40)
+            scaled_width = min(scaled_width, max_width)
+            scaled_height = min(scaled_height, max_height)
+
+            window.geometry(f"{scaled_width}x{scaled_height}")
+            window.update_idletasks()
+
+            hwnd = window.winfo_id()
+            frame_hwnd = ctypes.windll.user32.GetParent(hwnd) or hwnd
+            frame_rect = RECT()
+            ctypes.windll.user32.GetWindowRect(frame_hwnd, ctypes.byref(frame_rect))
+            outer_w = frame_rect.r - frame_rect.l
+            outer_h = frame_rect.b - frame_rect.t
+        except Exception:
+            window.geometry(f"{scaled_width}x{scaled_height}")
+            window.update_idletasks()
+            pass
+    else:
+        window.geometry(f"{scaled_width}x{scaled_height}")
+        window.update_idletasks()
+
+    x = work_x + max(0, (work_w - outer_w) // 2)
+    y = work_y + max(0, (work_h - outer_h) // 2)
+    window.geometry(f"{scaled_width}x{scaled_height}+{x}+{y}")
+
+
+def center_window(window, width, height):
+    _center_window_now(window, width, height)
+
+    try:
+        window.after_idle(lambda: _center_window_now(window, width, height))
+    except Exception:
+        pass

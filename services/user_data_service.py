@@ -53,7 +53,7 @@ class UserDataService:
     @staticmethod
     def _default_data() -> Dict[str, Any]:
         return {
-            "version": "0.0.1",
+            "version": "0.0.3",
             "last_file": "",
             "theme": "light",
             "progress": {},

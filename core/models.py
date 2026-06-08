@@ -30,11 +30,11 @@ class Question:
     
     def is_judge(self) -> bool:
         """是否为判断题"""
-        return self.type == "judge"
+        return self.type in ("judge", "judgement")
     
     def is_short_answer(self) -> bool:
         """是否为简答题"""
-        return self.type == "short"
+        return self.type in ("short", "essay", "fill")
     
     def get_correct_options(self) -> List[str]:
         """获取正确选项列表（用于多选题）"""
