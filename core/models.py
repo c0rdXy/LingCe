@@ -158,11 +158,11 @@ class QuestionBank:
     
 
     def get_collected_questions(self) -> List[Question]:
-        # 获取已收藏的题目
+        """获取已收藏的题目。"""
         return [q for q in self.questions if q.is_collected]
 
     def get_questions_by_type_and_collected(self, question_type: str, collected_only: bool = False) -> List[Question]:
-        # 根据题型和收藏状态筛选题目
+        """按题型和收藏状态筛选题目。"""
         questions = self.get_collected_questions() if collected_only else self.questions
         if question_type == 'all':
             return questions

@@ -13,6 +13,8 @@ import tempfile
 from pathlib import Path
 
 class SecureBuild:
+    """安全打包流程封装。"""
+
     def __init__(self):
         self.root_dir = Path(__file__).parent
         self.source_dir = self.root_dir

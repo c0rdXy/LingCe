@@ -99,10 +99,12 @@ _current_theme = "light"
 
 
 def get_theme() -> str:
+    """获取当前主题名称。"""
     return _current_theme
 
 
 def set_theme(theme_name: str):
+    """设置当前主题；未知主题会被忽略。"""
     global _current_theme
     if theme_name in THEMES:
         _current_theme = theme_name

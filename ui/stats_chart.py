@@ -1,1 +1,1 @@
-# Deprecated: removed in v0.0.3, replaced by ui/exam_stats.py
+"""已废弃：v0.0.3 起由 ui.exam_stats 替代。"""

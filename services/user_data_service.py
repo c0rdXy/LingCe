@@ -48,10 +48,12 @@ class UserDataService:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
     def reload(self):
+        """重新从磁盘加载用户数据。"""
         self._load()
 
     @staticmethod
     def _default_data() -> Dict[str, Any]:
+        """返回新的默认用户数据结构。"""
         return {
             "version": "0.0.3",
             "last_file": "",
@@ -72,9 +74,11 @@ class UserDataService:
     # ------------------------------------------------------------------ #
 
     def get_last_file(self) -> str:
+        """获取最近一次打开的题库文件路径。"""
         return self._data.get("last_file", "")
 
     def set_last_file(self, file_path: str):
+        """保存最近一次打开的题库文件路径。"""
         self._data["last_file"] = str(file_path)
         self._save()
 
@@ -83,9 +87,11 @@ class UserDataService:
     # ------------------------------------------------------------------ #
 
     def get_theme(self) -> str:
+        """获取用户保存的主题名称。"""
         return self._data.get("theme", "light")
 
     def set_theme(self, theme: str):
+        """保存用户选择的主题名称。"""
         self._data["theme"] = theme
         self._save()
 

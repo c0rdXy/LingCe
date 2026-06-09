@@ -69,6 +69,48 @@ class MainWindow:
         self.root.configure(bg=tc["bg"])
         self.DEFAULT_BG_COLOR = tc["bg"]
 
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure("TFrame", background=tc["bg"])
+        style.configure("TLabel", background=tc["bg"], foreground=tc["text"])
+        style.configure("TLabelframe", background=tc["bg"], foreground=tc["text"])
+        style.configure("TLabelframe.Label", background=tc["bg"], foreground=tc["text"])
+        style.configure("TRadiobutton", background=tc["card_bg"], foreground=tc["text"])
+        style.configure("TCheckbutton", background=tc["card_bg"], foreground=tc["text"])
+        style.map(
+            "TRadiobutton",
+            background=[("active", tc["card_bg"]), ("disabled", tc["card_bg"])],
+            foreground=[("disabled", tc["text_secondary"])],
+        )
+        style.map(
+            "TCheckbutton",
+            background=[("active", tc["card_bg"]), ("disabled", tc["card_bg"])],
+            foreground=[("disabled", tc["text_secondary"])],
+        )
+        style.configure(
+            "TButton",
+            background=tc["bg_secondary"],
+            foreground=tc["text"],
+            bordercolor=tc["card_border"],
+            lightcolor=tc["bg_secondary"],
+            darkcolor=tc["card_border"],
+        )
+        style.map(
+            "TButton",
+            background=[("active", tc["card_bg"]), ("disabled", tc["bg_secondary"])],
+            foreground=[("disabled", tc["text_secondary"])],
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground=tc["bg_secondary"],
+            foreground=tc["text"],
+            insertcolor=tc["text"],
+        )
+
     # ------------------------------------------------------------------ #
     #  主界面
     # ------------------------------------------------------------------ #
@@ -93,17 +135,38 @@ class MainWindow:
         self._create_footer(outer, tc)
 
     def _create_menu_bar(self):
-        menubar = tk.Menu(self.root)
+        tc = get_theme_colors()
+        menubar = tk.Menu(
+            self.root,
+            bg=tc["bg_secondary"],
+            fg=tc["text"],
+            activebackground=tc["primary"],
+            activeforeground="#ffffff",
+        )
         self.root.config(menu=menubar)
 
-        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu = tk.Menu(
+            menubar,
+            tearoff=0,
+            bg=tc["bg_secondary"],
+            fg=tc["text"],
+            activebackground=tc["primary"],
+            activeforeground="#ffffff",
+        )
         menubar.add_cascade(label="文件", menu=file_menu)
         file_menu.add_command(label="选择题库", command=self.load_question_bank)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
 
         # 主题菜单
-        theme_menu = tk.Menu(menubar, tearoff=0)
+        theme_menu = tk.Menu(
+            menubar,
+            tearoff=0,
+            bg=tc["bg_secondary"],
+            fg=tc["text"],
+            activebackground=tc["primary"],
+            activeforeground="#ffffff",
+        )
         menubar.add_cascade(label="主题", menu=theme_menu)
         for theme_name in THEMES:
             theme_menu.add_command(
@@ -214,6 +277,7 @@ class MainWindow:
         tc = get_theme_colors()
         self.file_info_label.config(
             text=f"已加载: {file_info['file_name']} ({file_info['question_count']}题)",
+            bg=tc["bg"],
             fg=tc["success"],
         )
         self._show_type_distribution(file_info["type_distribution"], tc)
@@ -224,7 +288,7 @@ class MainWindow:
             w.destroy()
 
         tk.Label(self.stats_frame, text="题型分布:", font=BOLD_FONT,
-                 bg=tc["bg"]).pack(anchor="w")
+                 bg=tc["bg"], fg=tc["text"]).pack(anchor="w")
 
         container = tk.Frame(self.stats_frame, bg=tc["bg"])
         container.pack(fill="x", pady=5)
@@ -235,7 +299,7 @@ class MainWindow:
             pct = (count / total * 100) if total > 0 else 0
             f = tk.Frame(container, bg=tc["bg"])
             f.pack(side="left", padx=(0, 20))
-            tk.Label(f, text=name, font=DEFAULT_FONT, bg=tc["bg"]).pack()
+            tk.Label(f, text=name, font=DEFAULT_FONT, bg=tc["bg"], fg=tc["text"]).pack()
             tk.Label(f, text=f"{count}题 ({pct:.1f}%)", font=get_font(9),
                      bg=tc["bg"], fg=tc["primary"]).pack()
 

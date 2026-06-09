@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""考试统计与趋势分析窗口。"""
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -11,6 +12,7 @@ from services.exam_db import query_by_date, query_all, get_daily_avg
 
 
 def _load_matplotlib():
+    """按需加载 matplotlib，未安装时返回 None。"""
     try:
         import matplotlib
         matplotlib.use("TkAgg")
@@ -26,6 +28,7 @@ def _load_matplotlib():
 
 
 class ExamStatsPanel:
+    """考试历史记录和每日平均分趋势面板。"""
 
     def __init__(self, parent_window):
         self.parent = parent_window
@@ -186,4 +189,5 @@ class ExamStatsPanel:
 
 
 def show_exam_stats(parent_window):
+    """打开考试统计窗口。"""
     ExamStatsPanel(parent_window)

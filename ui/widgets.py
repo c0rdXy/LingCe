@@ -7,7 +7,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from typing import List, Dict, Any, Optional, Callable
-from core.config import DEFAULT_FONT, BOLD_FONT, COLORS
+from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_theme_colors
 from core.models import Question
 
 
@@ -63,13 +63,15 @@ class QuestionWidget:
 
     def render(self) -> tk.Frame:
         """渲染完整的题目框架，返回外层 Frame"""
-        frame = tk.Frame(self.parent, bg="white", relief="solid", bd=1)
+        tc = get_theme_colors()
+        frame = tk.Frame(self.parent, bg=tc["card_bg"], relief="solid", bd=1,
+                         highlightbackground=tc["card_border"])
 
         # 标题栏
         self._render_title(frame)
 
         # 内容区
-        content = tk.Frame(frame, bg="white")
+        content = tk.Frame(frame, bg=tc["card_bg"])
         content.pack(fill="both", expand=True, padx=10, pady=10)
 
         # 题目文本
@@ -77,6 +79,7 @@ class QuestionWidget:
         q_text = scrolledtext.ScrolledText(
             content, height=text_height, wrap=tk.WORD,
             font=DEFAULT_FONT, relief="flat", bd=1,
+            bg=tc["card_bg"], fg=tc["text"], insertbackground=tc["text"],
         )
         q_text.pack(fill="x", pady=(0, 10))
         q_text.insert("1.0", self.question.question)
@@ -121,7 +124,8 @@ class QuestionWidget:
     # ---- 内部渲染 ----
 
     def _render_title(self, parent):
-        title_frame = tk.Frame(parent, bg="lightblue", height=40)
+        tc = get_theme_colors()
+        title_frame = tk.Frame(parent, bg=tc["header_bg"], height=40)
         title_frame.pack(fill="x", padx=2, pady=2)
         title_frame.pack_propagate(False)
 
@@ -131,7 +135,8 @@ class QuestionWidget:
             title_text += f" [ID: {self.question.id}]"
 
         tk.Label(
-            title_frame, text=title_text, font=BOLD_FONT, background="lightblue"
+            title_frame, text=title_text, font=BOLD_FONT,
+            background=tc["header_bg"], foreground=tc["header_fg"]
         ).pack(side="left", padx=10, pady=8)
 
     def _render_options(self, parent):
@@ -149,34 +154,35 @@ class QuestionWidget:
 
     def _render_single(self, parent, options: List[str]):
         self.answer_var = tk.StringVar()
-        options_frame = tk.Frame(parent, bg="white")
+        tc = get_theme_colors()
+        options_frame = tk.Frame(parent, bg=tc["card_bg"])
         options_frame.pack(fill="x", pady=5)
 
         for option in options:
             letter = option.split(".", 1)[0].strip() if "." in option else option[:1]
             text = option.split(".", 1)[1].strip() if "." in option else option
-            container = tk.Frame(options_frame, bg="white")
+            container = tk.Frame(options_frame, bg=tc["card_bg"])
             container.pack(fill="x", pady=3)
 
             if self.review_mode:
                 # 回顾：高亮正确/错误
-                fg = "black"
+                fg = tc["text"]
                 if letter.upper() == self.correct_answer.upper():
                     fg = "green"
                 elif letter.upper() == self.user_answer.upper() and letter.upper() != self.correct_answer.upper():
                     fg = "red"
 
                 tk.Label(container, text=f"{letter}.", font=DEFAULT_FONT,
-                         fg=fg, bg="white").pack(side="left", anchor="n")
+                         fg=fg, bg=tc["card_bg"]).pack(side="left", anchor="n")
                 lbl = tk.Label(container, text=text, font=DEFAULT_FONT,
-                               fg=fg, bg="white", anchor="w", justify="left")
+                               fg=fg, bg=tc["card_bg"], anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True, padx=(5, 0))
             else:
                 rb = ttk.Radiobutton(container, text=f"{letter}.",
                                      variable=self.answer_var, value=letter)
                 rb.pack(side="left", anchor="n")
                 lbl = tk.Label(container, text=text, font=DEFAULT_FONT,
-                               bg="white", anchor="w", justify="left")
+                               bg=tc["card_bg"], fg=tc["text"], anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True, padx=(5, 0))
                 lbl.bind("<Button-1>", lambda e, v=letter: self.answer_var.set(v))
 
@@ -186,7 +192,8 @@ class QuestionWidget:
 
     def _render_multiple(self, parent, options: List[str]):
         self.multi_vars = []
-        options_frame = tk.Frame(parent, bg="white")
+        tc = get_theme_colors()
+        options_frame = tk.Frame(parent, bg=tc["card_bg"])
         options_frame.pack(fill="x", pady=5)
 
         user_letters = set(self.user_answer.upper()) if self.review_mode else set()
@@ -195,27 +202,27 @@ class QuestionWidget:
         for option in options:
             letter = option.split(".", 1)[0].strip() if "." in option else option[:1]
             text = option.split(".", 1)[1].strip() if "." in option else option
-            container = tk.Frame(options_frame, bg="white")
+            container = tk.Frame(options_frame, bg=tc["card_bg"])
             container.pack(fill="x", pady=3)
 
             if self.review_mode:
-                fg = "black"
+                fg = tc["text"]
                 if letter.upper() in correct_letters:
                     fg = "green"
                 elif letter.upper() in user_letters and letter.upper() not in correct_letters:
                     fg = "red"
 
                 tk.Label(container, text=f"{letter}.", font=DEFAULT_FONT,
-                         fg=fg, bg="white").pack(side="left", anchor="n")
+                         fg=fg, bg=tc["card_bg"]).pack(side="left", anchor="n")
                 lbl = tk.Label(container, text=text, font=DEFAULT_FONT,
-                               fg=fg, bg="white", anchor="w", justify="left")
+                               fg=fg, bg=tc["card_bg"], anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True, padx=(5, 0))
             else:
                 var = tk.BooleanVar(value=False)
                 cb = ttk.Checkbutton(container, text=f"{letter}.", variable=var)
                 cb.pack(side="left", anchor="n")
                 lbl = tk.Label(container, text=text, font=DEFAULT_FONT,
-                               bg="white", anchor="w", justify="left")
+                               bg=tc["card_bg"], fg=tc["text"], anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True, padx=(5, 0))
                 lbl.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
                 self.multi_vars.append((var, letter))
@@ -225,23 +232,24 @@ class QuestionWidget:
 
     def _render_judge(self, parent):
         self.answer_var = tk.StringVar()
-        frame = tk.Frame(parent, bg="white")
+        tc = get_theme_colors()
+        frame = tk.Frame(parent, bg=tc["card_bg"])
         frame.pack(fill="x", pady=5)
-        judge_frame = tk.Frame(frame, bg="white")
+        judge_frame = tk.Frame(frame, bg=tc["card_bg"])
         judge_frame.pack(anchor="w", pady=10)
 
         if self.review_mode:
-            fg_true = "green" if self.correct_answer.upper() in ("A", "√", "正确") else "black"
-            fg_false = "green" if self.correct_answer.upper() in ("B", "×", "错误") else "black"
+            fg_true = "green" if self.correct_answer.upper() in ("A", "√", "正确") else tc["text"]
+            fg_false = "green" if self.correct_answer.upper() in ("B", "×", "错误") else tc["text"]
             if self.user_answer.upper() == "A" and fg_true != "green":
                 fg_true = "red"
             if self.user_answer.upper() == "B" and fg_false != "green":
                 fg_false = "red"
 
             tk.Label(judge_frame, text="正确", font=DEFAULT_FONT,
-                     fg=fg_true, bg="white").pack(side="left", padx=20)
+                     fg=fg_true, bg=tc["card_bg"]).pack(side="left", padx=20)
             tk.Label(judge_frame, text="错误", font=DEFAULT_FONT,
-                     fg=fg_false, bg="white").pack(side="left", padx=20)
+                     fg=fg_false, bg=tc["card_bg"]).pack(side="left", padx=20)
         else:
             ttk.Radiobutton(judge_frame, text="正确",
                             variable=self.answer_var, value="A").pack(side="left", padx=20)
@@ -251,13 +259,16 @@ class QuestionWidget:
     def _render_text_input(self, parent):
         qtype = self.question.type
         label_text = "请填写答案：" if qtype == "fill" else "请输入答案："
-        input_frame = tk.Frame(parent, bg="white")
+        tc = get_theme_colors()
+        input_frame = tk.Frame(parent, bg=tc["card_bg"])
         input_frame.pack(fill="both", expand=True, pady=5)
 
-        tk.Label(input_frame, text=label_text, font=DEFAULT_FONT).pack(anchor="w", pady=(10, 5))
+        tk.Label(input_frame, text=label_text, font=DEFAULT_FONT,
+                 bg=tc["card_bg"], fg=tc["text"]).pack(anchor="w", pady=(10, 5))
         state = "disabled" if self.review_mode else "normal"
         self.text_widget = scrolledtext.ScrolledText(
             input_frame, font=DEFAULT_FONT, wrap=tk.WORD, height=6, state=state,
+            bg=tc["bg_secondary"], fg=tc["text"], insertbackground=tc["text"],
         )
         self.text_widget.pack(fill="both", expand=True, pady=5)
 
@@ -268,33 +279,39 @@ class QuestionWidget:
 
     def _render_analysis(self, parent):
         """回顾模式：显示答案解析"""
-        analysis_frame = tk.Frame(parent, bg="#f0f0f0", relief="solid", bd=1)
+        tc = get_theme_colors()
+        analysis_bg = tc["answer_bg"]
+        analysis_frame = tk.Frame(parent, bg=analysis_bg, relief="solid", bd=1)
         analysis_frame.pack(fill="x", pady=(15, 5))
 
         # 正确答案
-        answer_frame = tk.Frame(analysis_frame, bg="#f0f0f0")
+        answer_frame = tk.Frame(analysis_frame, bg=analysis_bg)
         answer_frame.pack(fill="x", padx=10, pady=5)
-        tk.Label(answer_frame, text="正确答案：", font=BOLD_FONT, bg="#f0f0f0").pack(side="left")
+        tk.Label(answer_frame, text="正确答案：", font=BOLD_FONT,
+                 bg=analysis_bg, fg=tc["text"]).pack(side="left")
         tk.Label(answer_frame, text=self.correct_answer, font=DEFAULT_FONT,
-                 fg="green", bg="#f0f0f0").pack(side="left")
+                 fg=tc["correct_fg"], bg=analysis_bg).pack(side="left")
 
         # 用户答案
         if self.user_answer:
             is_correct = self._check_correct()
             user_fg = "green" if is_correct else "red"
-            user_frame = tk.Frame(analysis_frame, bg="#f0f0f0")
+            user_frame = tk.Frame(analysis_frame, bg=analysis_bg)
             user_frame.pack(fill="x", padx=10, pady=5)
-            tk.Label(user_frame, text="你的答案：", font=BOLD_FONT, bg="#f0f0f0").pack(side="left")
+            tk.Label(user_frame, text="你的答案：", font=BOLD_FONT,
+                     bg=analysis_bg, fg=tc["text"]).pack(side="left")
             tk.Label(user_frame, text=self.user_answer, font=DEFAULT_FONT,
-                     fg=user_fg, bg="#f0f0f0").pack(side="left")
+                     fg=user_fg, bg=analysis_bg).pack(side="left")
 
         # 解析
         if self.question.explanation:
-            expl_frame = tk.Frame(analysis_frame, bg="#f0f0f0")
+            expl_frame = tk.Frame(analysis_frame, bg=analysis_bg)
             expl_frame.pack(fill="x", padx=10, pady=5)
-            tk.Label(expl_frame, text="解析：", font=BOLD_FONT, bg="#f0f0f0").pack(anchor="w")
+            tk.Label(expl_frame, text="解析：", font=BOLD_FONT,
+                     bg=analysis_bg, fg=tc["text"]).pack(anchor="w")
             expl_text = tk.Text(expl_frame, height=3, wrap=tk.WORD, font=DEFAULT_FONT,
-                                relief="flat", bg="#f0f0f0")
+                                relief="flat", bg=analysis_bg, fg=tc["text"],
+                                insertbackground=tc["text"])
             expl_text.pack(fill="x")
             expl_text.insert("1.0", self.question.explanation)
             expl_text.config(state="disabled")

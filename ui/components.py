@@ -7,7 +7,7 @@ UI 组件模块 — 通用 UI 组件和工具函数
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from typing import List, Dict, Any, Callable, Optional
-from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, LAYOUT
+from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, LAYOUT, get_theme_colors
 
 
 class QuestionDisplay:
@@ -22,10 +22,12 @@ class QuestionDisplay:
         
     def create_question_frame(self) -> tk.Frame:
         """创建题目显示框架"""
-        frame = tk.Frame(self.parent, bg='white', relief='solid', bd=1)
+        tc = get_theme_colors()
+        frame = tk.Frame(self.parent, bg=tc["card_bg"], relief='solid', bd=1,
+                         highlightbackground=tc["card_border"])
         
         # 题目标题
-        title_frame = tk.Frame(frame, bg='lightblue', height=40)
+        title_frame = tk.Frame(frame, bg=tc["header_bg"], height=40)
         title_frame.pack(fill='x', padx=2, pady=2)
         title_frame.pack_propagate(False)
         
@@ -33,16 +35,17 @@ class QuestionDisplay:
         if self.question_data.get('show_id', False):
             title_text += f" [ID: {self.question_data.get('id', 0)}]"
         
-        tk.Label(title_frame, text=title_text, font=BOLD_FONT, 
-                 background='lightblue').pack(side='left', padx=10, pady=8)
+        tk.Label(title_frame, text=title_text, font=BOLD_FONT,
+                 background=tc["header_bg"], foreground=tc["header_fg"]).pack(side='left', padx=10, pady=8)
         
         # 题目内容
-        content_frame = tk.Frame(frame, bg='white')
+        content_frame = tk.Frame(frame, bg=tc["card_bg"])
         content_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
         # 题目文本
         question_text = tk.Text(content_frame, height=3, wrap=tk.WORD, font=DEFAULT_FONT,
-                               relief='flat', bd=0, bg='white')
+                               relief='flat', bd=0, bg=tc["card_bg"], fg=tc["text"],
+                               insertbackground=tc["text"])
         question_text.pack(fill='x', pady=(0, 10))
         question_text.insert('1.0', self.question_data.get('question', ''))
         question_text.config(state='disabled')
@@ -70,7 +73,8 @@ class QuestionDisplay:
     
     def create_single_choice_options(self, parent, options: List[str]):
         """创建单选选项"""
-        options_frame = tk.Frame(parent, bg='white')
+        tc = get_theme_colors()
+        options_frame = tk.Frame(parent, bg=tc["card_bg"])
         options_frame.pack(fill='x', pady=5)
         
         for option in options:
@@ -78,7 +82,7 @@ class QuestionDisplay:
             option_text = option[3:] if len(option) > 3 else option
             
             # 创建选项容器，支持文本换行
-            option_container = tk.Frame(options_frame, bg='white')
+            option_container = tk.Frame(options_frame, bg=tc["card_bg"])
             option_container.pack(fill='x', pady=2)
             
             # 单选按钮（显示选项字母）
@@ -88,7 +92,7 @@ class QuestionDisplay:
             
             # 选项文本（支持换行，只显示选项内容）
             option_label = tk.Label(option_container, text=option_text,
-                                  font=DEFAULT_FONT, bg='white', anchor='w', justify='left',
+                                  font=DEFAULT_FONT, bg=tc["card_bg"], fg=tc["text"], anchor='w', justify='left',
                                   wraplength=650)
             option_label.pack(side='left', fill='x', expand=True, padx=(5, 0))
             
@@ -97,7 +101,8 @@ class QuestionDisplay:
     
     def create_judge_options(self, parent):
         """创建判断题选项"""
-        options_frame = tk.Frame(parent, bg='white')
+        tc = get_theme_colors()
+        options_frame = tk.Frame(parent, bg=tc["card_bg"])
         options_frame.pack(fill='x', pady=5)
         
         # 正确选项
@@ -112,7 +117,8 @@ class QuestionDisplay:
     
     def create_multiple_choice_options(self, parent, options: List[str]):
         """创建多选选项"""
-        options_frame = tk.Frame(parent, bg='white')
+        tc = get_theme_colors()
+        options_frame = tk.Frame(parent, bg=tc["card_bg"])
         options_frame.pack(fill='x', pady=5)
         
         for option in options:
@@ -120,7 +126,7 @@ class QuestionDisplay:
             option_text = option[3:] if len(option) > 3 else option
             
             # 创建选项容器，支持文本换行
-            option_container = tk.Frame(options_frame, bg='white')
+            option_container = tk.Frame(options_frame, bg=tc["card_bg"])
             option_container.pack(fill='x', pady=2)
             
             # 复选框（显示选项字母）
@@ -132,7 +138,7 @@ class QuestionDisplay:
             
             # 选项文本（支持换行，只显示选项内容）
             option_label = tk.Label(option_container, text=option_text,
-                                  font=DEFAULT_FONT, bg='white', anchor='w', justify='left',
+                                  font=DEFAULT_FONT, bg=tc["card_bg"], fg=tc["text"], anchor='w', justify='left',
                                   wraplength=650)
             option_label.pack(side='left', fill='x', expand=True, padx=(5, 0))
             
@@ -141,21 +147,29 @@ class QuestionDisplay:
     
     def create_short_answer_input(self, parent):
         """创建简答题输入框"""
-        input_frame = tk.Frame(parent, bg='white')
+        tc = get_theme_colors()
+        input_frame = tk.Frame(parent, bg=tc["card_bg"])
         input_frame.pack(fill='x', pady=5)
         
-        tk.Label(input_frame, text="请输入答案：", font=BOLD_FONT, bg='white').pack(anchor='w')
-        self.short_text_widget = tk.Text(input_frame, height=4, wrap=tk.WORD, font=DEFAULT_FONT)
+        tk.Label(input_frame, text="请输入答案：", font=BOLD_FONT,
+                 bg=tc["card_bg"], fg=tc["text"]).pack(anchor='w')
+        self.short_text_widget = tk.Text(input_frame, height=4, wrap=tk.WORD, font=DEFAULT_FONT,
+                                         bg=tc["bg_secondary"], fg=tc["text"],
+                                         insertbackground=tc["text"])
         self.short_text_widget.pack(fill='x', pady=5)
     
     def create_fill_blank_input(self, parent):
         """创建填空题输入框"""
-        input_frame = tk.Frame(parent, bg='white')
+        tc = get_theme_colors()
+        input_frame = tk.Frame(parent, bg=tc["card_bg"])
         input_frame.pack(fill='x', pady=5)
         
-        tk.Label(input_frame, text="请填入答案：", font=BOLD_FONT, bg='white').pack(anchor='w')
+        tk.Label(input_frame, text="请填入答案：", font=BOLD_FONT,
+                 bg=tc["card_bg"], fg=tc["text"]).pack(anchor='w')
         # 创建单行输入框
-        self.fill_entry = tk.Entry(input_frame, font=DEFAULT_FONT)
+        self.fill_entry = tk.Entry(input_frame, font=DEFAULT_FONT,
+                                   bg=tc["bg_secondary"], fg=tc["text"],
+                                   insertbackground=tc["text"])
         self.fill_entry.pack(fill='x', pady=5)
     
     def get_user_answer(self) -> str:
@@ -219,10 +233,13 @@ class AnswerStatusPanel:
     
     def create_panel(self) -> tk.Frame:
         """创建状态面板"""
-        frame = tk.Frame(self.parent, bg='white', relief='solid', bd=1)
+        tc = get_theme_colors()
+        frame = tk.Frame(self.parent, bg=tc["card_bg"], relief='solid', bd=1,
+                         highlightbackground=tc["card_border"])
         
         # 标题
-        title_label = tk.Label(frame, text="答题状态", font=BOLD_FONT)
+        title_label = tk.Label(frame, text="答题状态", font=BOLD_FONT,
+                               bg=tc["card_bg"], fg=tc["text"])
         title_label.pack(pady=5)
         
         # 创建状态按钮
@@ -232,7 +249,8 @@ class AnswerStatusPanel:
     
     def create_status_buttons(self, parent):
         """创建状态按钮"""
-        buttons_frame = tk.Frame(parent)
+        tc = get_theme_colors()
+        buttons_frame = tk.Frame(parent, bg=tc["card_bg"])
         buttons_frame.pack(fill='x', padx=5, pady=5)
         
         # 计算每行按钮数量
@@ -241,7 +259,7 @@ class AnswerStatusPanel:
         
         for i in range(self.total_questions):
             if i % buttons_per_row == 0:
-                current_row = tk.Frame(buttons_frame)
+                current_row = tk.Frame(buttons_frame, bg=tc["card_bg"])
                 current_row.pack(fill='x', pady=1)
             
             btn = tk.Button(current_row, text=str(i + 1), width=3, height=1,
@@ -258,7 +276,8 @@ class AnswerStatusPanel:
                 else:
                     btn.config(bg='red', fg='white')
             else:
-                btn.config(bg='white', fg='black')
+                tc = get_theme_colors()
+                btn.config(bg=tc["bg_secondary"], fg=tc["text"])
 
 
 class TimerDisplay:
@@ -271,10 +290,14 @@ class TimerDisplay:
         
     def create_timer(self) -> tk.Frame:
         """创建计时器"""
-        frame = tk.Frame(self.parent, bg='white', relief='solid', bd=1)
+        tc = get_theme_colors()
+        frame = tk.Frame(self.parent, bg=tc["card_bg"], relief='solid', bd=1,
+                         highlightbackground=tc["card_border"])
         
-        tk.Label(frame, text="剩余时间:", font=BOLD_FONT).pack(pady=5)
-        self.time_label = tk.Label(frame, text="00:00", font=('Arial', 24, 'bold'))
+        tk.Label(frame, text="剩余时间:", font=BOLD_FONT,
+                 bg=tc["card_bg"], fg=tc["text"]).pack(pady=5)
+        self.time_label = tk.Label(frame, text="00:00", font=('Arial', 24, 'bold'),
+                                   bg=tc["card_bg"], fg=tc["success"])
         self.time_label.pack(pady=5)
         
         return frame
@@ -285,18 +308,18 @@ class TimerDisplay:
         
         if remaining_seconds <= 0:
             time_text = "00:00"
-            color = 'red'
+            color = get_theme_colors()["danger"]
         else:
             minutes = remaining_seconds // 60
             seconds = remaining_seconds % 60
             time_text = f"{minutes:02d}:{seconds:02d}"
             
             if remaining_seconds <= 300:  # 5分钟内显示红色
-                color = 'red'
+                color = get_theme_colors()["danger"]
             elif remaining_seconds <= 600:  # 10分钟内显示橙色
-                color = 'orange'
+                color = get_theme_colors()["warning"]
             else:
-                color = 'green'
+                color = get_theme_colors()["success"]
         
         if self.time_label:
             self.time_label.config(text=time_text, fg=color)
@@ -315,12 +338,15 @@ class StatisticsDisplay:
         
     def create_stats_panel(self) -> tk.Frame:
         """创建统计面板"""
-        frame = tk.Frame(self.parent, bg='white', relief='solid', bd=1)
+        tc = get_theme_colors()
+        frame = tk.Frame(self.parent, bg=tc["card_bg"], relief='solid', bd=1,
+                         highlightbackground=tc["card_border"])
         
-        tk.Label(frame, text="统计信息", font=BOLD_FONT).pack(pady=5)
+        tk.Label(frame, text="统计信息", font=BOLD_FONT,
+                 bg=tc["card_bg"], fg=tc["text"]).pack(pady=5)
         
         # 统计信息容器
-        stats_container = tk.Frame(frame, bg='white')
+        stats_container = tk.Frame(frame, bg=tc["card_bg"])
         stats_container.pack(fill='both', expand=True, padx=10, pady=5)
         
         return frame
@@ -337,7 +363,9 @@ class StatisticsDisplay:
         for key, value in stats.items():
             if key in ['total_questions', 'answered_count', 'correct_count', 'accuracy']:
                 label_text = self.get_stats_label_text(key, value)
-                label = tk.Label(self.parent, text=label_text, font=DEFAULT_FONT)
+                tc = get_theme_colors()
+                label = tk.Label(self.parent, text=label_text, font=DEFAULT_FONT,
+                                 bg=tc["card_bg"], fg=tc["text"])
                 label.pack(anchor='w', padx=10, pady=2)
                 self.stats_labels[key] = label
                 row += 1
@@ -355,7 +383,7 @@ class StatisticsDisplay:
 
 def create_button_group(parent, buttons_config: List[Dict[str, Any]]) -> tk.Frame:
     """创建按钮组"""
-    frame = tk.Frame(parent)
+    frame = tk.Frame(parent, bg=get_theme_colors()["bg"])
     
     for config in buttons_config:
         btn = ttk.Button(frame, 
@@ -373,14 +401,18 @@ def create_button_group(parent, buttons_config: List[Dict[str, Any]]) -> tk.Fram
 
 def create_info_panel(parent, title: str, content: str) -> tk.Frame:
     """创建信息面板"""
-    frame = tk.Frame(parent, bg='white', relief='solid', bd=1)
+    tc = get_theme_colors()
+    frame = tk.Frame(parent, bg=tc["card_bg"], relief='solid', bd=1,
+                     highlightbackground=tc["card_border"])
     
     # 标题
-    title_label = tk.Label(frame, text=title, font=BOLD_FONT)
+    title_label = tk.Label(frame, text=title, font=BOLD_FONT,
+                           bg=tc["card_bg"], fg=tc["text"])
     title_label.pack(pady=5)
     
     # 内容
-    content_label = tk.Label(frame, text=content, font=DEFAULT_FONT, wraplength=300)
+    content_label = tk.Label(frame, text=content, font=DEFAULT_FONT, wraplength=300,
+                             bg=tc["card_bg"], fg=tc["text"])
     content_label.pack(padx=10, pady=5)
     
     return frame
@@ -464,6 +496,7 @@ def _center_window_now(window, width, height):
 
 
 def center_window(window, width, height):
+    """按 DPI 缩放后的实际窗口尺寸居中显示窗口。"""
     _center_window_now(window, width, height)
 
     try:

@@ -12,7 +12,7 @@ import time
 import random
 from typing import Optional, Dict, Any, List
 
-from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_font
+from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_font, get_theme_colors
 from core.models import QuestionBank, Question
 from services.exam_service import ExamService
 from services.user_data_service import UserDataService
@@ -98,41 +98,50 @@ class ExamModeWindow:
     # ------------------------------------------------------------------ #
 
     def create_exam_interface(self):
+        tc = get_theme_colors()
         for widget in self.root.winfo_children():
             widget.destroy()
 
         self.root.title("灵测 LingCe - 考试模式")
+        self.root.configure(bg=tc["bg"])
         self._create_menu_bar()
 
-        main_frame = tk.Frame(self.root)
+        main_frame = tk.Frame(self.root, bg=tc["bg"])
         main_frame.pack(fill="both", expand=True)
 
         self._create_header(main_frame)
 
-        content = tk.Frame(main_frame)
+        content = tk.Frame(main_frame, bg=tc["bg"])
         content.pack(fill="both", expand=True, padx=10, pady=5)
 
-        right = tk.Frame(content, width=225)
+        right = tk.Frame(content, width=225, bg=tc["bg"])
         right.pack(side="right", fill="y", padx=(5, 0))
         right.pack_propagate(False)
         self._create_status_area(right)
 
-        left = tk.Frame(content)
+        left = tk.Frame(content, bg=tc["bg"])
         left.pack(side="left", fill="both", expand=True, padx=(0, 5))
         self._create_control_buttons(left)
         self._create_question_area(left)
 
     def _create_menu_bar(self):
-        menubar = tk.Menu(self.root)
+        tc = get_theme_colors()
+        menu_opts = {
+            "bg": tc["bg_secondary"],
+            "fg": tc["text"],
+            "activebackground": tc["primary"],
+            "activeforeground": "#ffffff",
+        }
+        menubar = tk.Menu(self.root, **menu_opts)
         self.root.config(menu=menubar)
 
-        exam_menu = tk.Menu(menubar, tearoff=0)
+        exam_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="考试", menu=exam_menu)
         exam_menu.add_command(label="提交试卷", command=self.submit_exam)
         exam_menu.add_separator()
         exam_menu.add_command(label="退出考试", command=self._confirm_exit)
 
-        nav_menu = tk.Menu(menubar, tearoff=0)
+        nav_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="导航", menu=nav_menu)
         nav_menu.add_command(label="上一题", command=self.prev_question)
         nav_menu.add_command(label="下一题", command=self.next_question)
@@ -156,21 +165,22 @@ class ExamModeWindow:
         self.timer_label.pack(side="right", padx=20, pady=15)
 
     def _create_question_area(self, parent):
-        self.question_container = tk.Frame(parent)
+        self.question_container = tk.Frame(parent, bg=get_theme_colors()["bg"])
         self.question_container.pack(fill="both", expand=True, pady=10)
         self._show_loading()
 
     def _create_control_buttons(self, parent):
-        ctrl = tk.Frame(parent, height=50)
+        tc = get_theme_colors()
+        ctrl = tk.Frame(parent, height=50, bg=tc["bg"])
         ctrl.pack(fill="x", side="bottom")
         ctrl.pack_propagate(False)
 
-        nav = tk.Frame(ctrl)
+        nav = tk.Frame(ctrl, bg=tc["bg"])
         nav.pack(side="left", pady=10)
         ttk.Button(nav, text="上一题 (←)", command=self.prev_question).pack(side="left", padx=5)
         ttk.Button(nav, text="下一题 (→)", command=self.next_question).pack(side="left", padx=5)
 
-        exam = tk.Frame(ctrl)
+        exam = tk.Frame(ctrl, bg=tc["bg"])
         exam.pack(side="right", pady=10)
         self.submit_exam_btn = tk.Button(exam, text="提交试卷",
                                          font=get_font(12, "bold"),
@@ -178,12 +188,14 @@ class ExamModeWindow:
         self.submit_exam_btn.pack(side="left", padx=5)
 
     def _create_status_area(self, parent):
-        status_frame = tk.LabelFrame(parent, text="答题状态", font=BOLD_FONT)
+        tc = get_theme_colors()
+        status_frame = tk.LabelFrame(parent, text="答题状态", font=BOLD_FONT,
+                                     bg=tc["bg"], fg=tc["text"])
         status_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-        canvas = tk.Canvas(status_frame)
+        canvas = tk.Canvas(status_frame, bg=tc["bg"], highlightthickness=0)
         scrollbar = ttk.Scrollbar(status_frame, orient="vertical", command=canvas.yview)
-        self.status_container = tk.Frame(canvas)
+        self.status_container = tk.Frame(canvas, bg=tc["bg"])
         self.status_container.bind("<Configure>",
                                    lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=self.status_container, anchor="nw")
@@ -224,8 +236,9 @@ class ExamModeWindow:
         question_index = 0
         for section_title, section_count, section_type in sections:
             # 题型标题
+            tc = get_theme_colors()
             title_label = tk.Label(self.status_container, text=section_title,
-                                   font=get_font(9, "bold"), bg="white", anchor="w")
+                                   font=get_font(9, "bold"), bg=tc["bg"], fg=tc["text"], anchor="w")
             title_label.grid(row=current_row, column=0, columnspan=cols,
                              sticky="w", padx=2, pady=(6, 2))
             current_row += 1
@@ -244,13 +257,17 @@ class ExamModeWindow:
             current_row += rows_used
 
     def _create_stats_area(self, parent):
-        stats_frame = tk.LabelFrame(parent, text="考试统计", font=BOLD_FONT)
+        tc = get_theme_colors()
+        stats_frame = tk.LabelFrame(parent, text="考试统计", font=BOLD_FONT,
+                                    bg=tc["bg"], fg=tc["text"])
         stats_frame.pack(fill="x", pady=(0, 10))
-        self.stats_container = tk.Frame(stats_frame)
+        self.stats_container = tk.Frame(stats_frame, bg=tc["bg"])
         self.stats_container.pack(fill="x", padx=10, pady=10)
-        self.answered_label = tk.Label(self.stats_container, text="已答: 0", font=DEFAULT_FONT)
+        self.answered_label = tk.Label(self.stats_container, text="已答: 0", font=DEFAULT_FONT,
+                                       bg=tc["bg"], fg=tc["text"])
         self.answered_label.pack(anchor="w")
-        self.unanswered_label = tk.Label(self.stats_container, text="未答: 0", font=DEFAULT_FONT)
+        self.unanswered_label = tk.Label(self.stats_container, text="未答: 0", font=DEFAULT_FONT,
+                                         bg=tc["bg"], fg=tc["text"])
         self.unanswered_label.pack(anchor="w")
 
     # ------------------------------------------------------------------ #
@@ -260,7 +277,9 @@ class ExamModeWindow:
     def _show_loading(self):
         for w in self.question_container.winfo_children():
             w.destroy()
-        tk.Label(self.question_container, text="正在加载考试题目...", font=DEFAULT_FONT).pack(expand=True)
+        tc = get_theme_colors()
+        tk.Label(self.question_container, text="正在加载考试题目...", font=DEFAULT_FONT,
+                 bg=tc["bg"], fg=tc["text"]).pack(expand=True)
 
     def show_current_question(self):
         if not self.exam_questions or self.current_question_index >= len(self.exam_questions):
@@ -391,7 +410,8 @@ class ExamModeWindow:
             self.unanswered_label.config(text=f"未答: {total - answered}/{total}")
 
     def _update_nav_buttons(self):
-        pass  # 简化，按钮始终可用
+        """导航按钮始终可用，无需动态状态更新。"""
+        pass
 
     def _highlight_review_status(self, wrong_ids: set):
         """回顾模式：答对绿色，答错/未答红色"""
@@ -596,6 +616,8 @@ class ExamModeWindow:
 
         result_window = tk.Toplevel(self.root)
         result_window.title("考试结果")
+        tc = get_theme_colors()
+        result_window.configure(bg=tc["bg"])
         center_window(result_window, 550, 600)
         result_window.transient(self.root)
         result_window.grab_set()
@@ -603,13 +625,14 @@ class ExamModeWindow:
         # 结果文本 - 使用 ScrolledText 固定高度，不挤压按钮
         from tkinter import scrolledtext
         text = scrolledtext.ScrolledText(result_window, wrap=tk.WORD, font=DEFAULT_FONT,
-                                         height=20)
+                                         height=20, bg=tc["bg_secondary"], fg=tc["text"],
+                                         insertbackground=tc["text"])
         text.pack(fill="both", expand=True, padx=20, pady=(20, 5))
         text.insert("1.0", result_text)
         text.config(state="disabled")
 
         # 按钮区域 - 固定在底部
-        btn_frame = tk.Frame(result_window)
+        btn_frame = tk.Frame(result_window, bg=tc["bg"])
         btn_frame.pack(side="bottom", fill="x", padx=20, pady=(5, 15))
 
         def on_close():
@@ -646,6 +669,7 @@ class ExamModeWindow:
                 text="返回主页",
                 font=get_font(12, "bold"),
                 bg="#6c757d", fg="white",
+                activebackground=tc["bg_secondary"], activeforeground=tc["text"],
                 command=self._return_to_main_from_review,
             )
         self.return_main_btn.pack(side="left", padx=5, before=self.submit_exam_btn)

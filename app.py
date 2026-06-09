@@ -10,6 +10,7 @@ from core.models import QuestionBank
 
 
 def _enable_windows_dpi_awareness():
+    """Enable DPI-aware geometry on Windows before Tk is initialized."""
     if sys.platform != "win32":
         return
     try:
@@ -56,6 +57,7 @@ class QuizApplication:
         self.root.after_idle(self._show_main_window)
 
     def _show_main_window(self):
+        """Show the main window after initial layout has settled."""
         from ui.components import center_window
 
         self.root.deiconify()
@@ -63,6 +65,7 @@ class QuizApplication:
         self.root.after(50, self._finish_startup)
 
     def _finish_startup(self):
+        """Finish startup after the window is centered and visible."""
         from ui.components import center_window
 
         center_window(self.root, 1100, 750)

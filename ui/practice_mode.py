@@ -7,7 +7,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import Optional, Dict, Any, Callable
-from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES
+from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES, get_theme_colors
 from core.models import QuestionBank, Question
 from services.question_service import QuestionService
 from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog, center_window
@@ -52,8 +52,10 @@ class PracticeModeWindow:
     
     def create_practice_interface(self):
         """创建练习界面"""
+        tc = get_theme_colors()
         # 设置窗口标题
         self.root.title("灵测 LingCe - 练习模式")
+        self.root.configure(bg=tc["bg"])
         
         # 清空窗口
         for widget in self.root.winfo_children():
@@ -63,11 +65,11 @@ class PracticeModeWindow:
         self.create_menu_bar()
         
         # 主容器
-        main_frame = tk.Frame(self.root)
+        main_frame = tk.Frame(self.root, bg=tc["bg"])
         main_frame.pack(fill='both', expand=True)
 
         # 右侧面板 - 固定宽度，先 pack 确保不被挤压
-        right_frame = tk.Frame(main_frame, width=280)
+        right_frame = tk.Frame(main_frame, width=280, bg=tc["bg"])
         right_frame.pack(side='right', fill='y', padx=(0, 10), pady=10)
         right_frame.pack_propagate(False)
 
@@ -75,7 +77,7 @@ class PracticeModeWindow:
         self.create_search_area(right_frame)
 
         # 左侧内容区域 - 填充剩余空间
-        left_frame = tk.Frame(main_frame)
+        left_frame = tk.Frame(main_frame, bg=tc["bg"])
         left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
 
         # 题型选择区域
@@ -89,18 +91,25 @@ class PracticeModeWindow:
     
     def create_menu_bar(self):
         """创建菜单栏"""
-        menubar = tk.Menu(self.root)
+        tc = get_theme_colors()
+        menu_opts = {
+            "bg": tc["bg_secondary"],
+            "fg": tc["text"],
+            "activebackground": tc["primary"],
+            "activeforeground": "#ffffff",
+        }
+        menubar = tk.Menu(self.root, **menu_opts)
         self.root.config(menu=menubar)
         
         # 文件菜单
-        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="文件", menu=file_menu)
         file_menu.add_command(label="返回主界面", command=self.return_to_main)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
         # 编辑菜单
-        edit_menu = tk.Menu(menubar, tearoff=0)
+        edit_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="编辑", menu=edit_menu)
         self.edit_menu_label = edit_menu
         edit_menu.add_command(label="编辑题目", command=self.toggle_edit_mode)
@@ -108,24 +117,26 @@ class PracticeModeWindow:
         edit_menu.add_command(label="另存为…", command=self.save_question_edit_as)
         
         # 练习菜单
-        practice_menu = tk.Menu(menubar, tearoff=0)
+        practice_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="练习", menu=practice_menu)
         practice_menu.add_command(label="重置统计", command=self.reset_statistics)
         practice_menu.add_command(label="错题复习", command=self.review_wrong_questions)
         practice_menu.add_command(label="随机打乱", command=self.shuffle_questions)
         
         # 工具菜单
-        tools_menu = tk.Menu(menubar, tearoff=0)
+        tools_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="工具", menu=tools_menu)
         tools_menu.add_command(label="按ID搜索", command=self.search_by_id)
         tools_menu.add_command(label="关键词搜索", command=self.search_by_keyword)
     def create_type_selection_area(self, parent):
         """创建题型选择区域"""
-        type_frame = tk.LabelFrame(parent, text="题型选择", font=BOLD_FONT)
+        tc = get_theme_colors()
+        type_frame = tk.LabelFrame(parent, text="题型选择", font=BOLD_FONT,
+                                   bg=tc["bg"], fg=tc["text"])
         type_frame.pack(fill='x', pady=(0, 10))
         
         # 题型选择按钮
-        buttons_frame = tk.Frame(type_frame)
+        buttons_frame = tk.Frame(type_frame, bg=tc["bg"])
         buttons_frame.pack(padx=10, pady=10)
         
         # 定义唯一的题型显示顺序，避免重复
@@ -146,22 +157,24 @@ class PracticeModeWindow:
     def create_question_area(self, parent):
         """创建题目显示区域（含右上角收藏按钮）"""
         # 外层包装：收藏按钮独立于 question_container
-        self.question_area_wrapper = tk.Frame(parent)
+        tc = get_theme_colors()
+        self.question_area_wrapper = tk.Frame(parent, bg=tc["bg"])
         self.question_area_wrapper.pack(fill='both', expand=True, pady=(0, 10))
 
         # 顶部工具栏（只放收藏按钮）
-        toolbar = tk.Frame(self.question_area_wrapper)
+        toolbar = tk.Frame(self.question_area_wrapper, bg=tc["bg"])
         toolbar.pack(fill='x')
 
         self.fav_btn = tk.Button(
             toolbar, text="☆ 收藏",
             font=DEFAULT_FONT, bd=1, relief="groove", cursor="hand2",
+            bg=tc["bg_secondary"], fg=tc["text"],
             command=self.toggle_favorite,
         )
         self.fav_btn.pack(side='right', padx=10, pady=2)
 
         # 题目容器（内容会被反复清空重建，不影响收藏按钮）
-        self.question_container = tk.Frame(self.question_area_wrapper)
+        self.question_container = tk.Frame(self.question_area_wrapper, bg=tc["bg"])
         self.question_container.pack(fill='both', expand=True)
 
         # 初始提示
@@ -169,11 +182,12 @@ class PracticeModeWindow:
 
     def create_control_buttons_area(self, parent):
         """创建底部控制按钮区域 — 单行两端对齐"""
-        control_frame = tk.Frame(parent)
+        tc = get_theme_colors()
+        control_frame = tk.Frame(parent, bg=tc["bg"])
         control_frame.pack(fill='x')
         
         # 左侧：导航按钮
-        nav_frame = tk.Frame(control_frame)
+        nav_frame = tk.Frame(control_frame, bg=tc["bg"])
         nav_frame.pack(side='left')
         
         self.prev_btn = ttk.Button(nav_frame, text="上一题",
@@ -189,10 +203,10 @@ class PracticeModeWindow:
         self.random_btn.pack(side='left', padx=5)
         
         # 中间弹性空间
-        tk.Frame(control_frame).pack(side='left', fill='x', expand=True)
+        tk.Frame(control_frame, bg=tc["bg"]).pack(side='left', fill='x', expand=True)
         
         # 右侧：答题按钮
-        answer_frame = tk.Frame(control_frame)
+        answer_frame = tk.Frame(control_frame, bg=tc["bg"])
         answer_frame.pack(side='right')
         
         self.show_answer_btn = ttk.Button(answer_frame, text="显示答案",
@@ -210,10 +224,12 @@ class PracticeModeWindow:
         self.submit_btn.pack(side='left', padx=5)
     def create_statistics_area(self, parent):
         """创建统计区域"""
-        stats_frame = tk.LabelFrame(parent, text="练习统计", font=BOLD_FONT)
+        tc = get_theme_colors()
+        stats_frame = tk.LabelFrame(parent, text="练习统计", font=BOLD_FONT,
+                                    bg=tc["bg"], fg=tc["text"])
         stats_frame.pack(fill='x', pady=(0, 10))
         
-        self.stats_container = tk.Frame(stats_frame)
+        self.stats_container = tk.Frame(stats_frame, bg=tc["bg"])
         self.stats_container.pack(fill='both', expand=True, padx=10, pady=10)
         
         # 初始化统计显示
@@ -221,14 +237,16 @@ class PracticeModeWindow:
     
     def create_search_area(self, parent):
         """创建搜索区域"""
-        search_frame = tk.LabelFrame(parent, text="题目搜索", font=BOLD_FONT)
+        tc = get_theme_colors()
+        search_frame = tk.LabelFrame(parent, text="题目搜索", font=BOLD_FONT,
+                                     bg=tc["bg"], fg=tc["text"])
         search_frame.pack(fill='x', pady=(0, 10))
         
-        search_container = tk.Frame(search_frame)
+        search_container = tk.Frame(search_frame, bg=tc["bg"])
         search_container.pack(fill='x', padx=10, pady=10)
         
         # ID搜索
-        id_frame = tk.Frame(search_container)
+        id_frame = tk.Frame(search_container, bg=tc["bg"])
         id_frame.pack(fill='x', pady=(0, 5))
         
         ttk.Label(id_frame, text="题目ID:").pack(side='left')
@@ -240,7 +258,7 @@ class PracticeModeWindow:
                   command=self.search_by_id).pack(side='right')
         
         # 关键词搜索
-        keyword_frame = tk.Frame(search_container)
+        keyword_frame = tk.Frame(search_container, bg=tc["bg"])
         keyword_frame.pack(fill='x', pady=(5, 0))
         
         ttk.Label(keyword_frame, text="关键词:").pack(anchor='w')
@@ -258,16 +276,20 @@ class PracticeModeWindow:
         
         loading_label = tk.Label(self.question_container, 
                                 text="正在加载题目...",
-                                font=DEFAULT_FONT)
+                                font=DEFAULT_FONT,
+                                bg=get_theme_colors()["bg"],
+                                fg=get_theme_colors()["text"])
         loading_label.pack(expand=True)
     
     def _show_practice_range_dialog(self):
         """显示练习范围选择对话框"""
+        tc = get_theme_colors()
         total = len(self.question_service.question_bank.questions) if self.question_service.question_bank else 0
         collected = len(self.question_service.question_bank.get_collected_questions()) if self.question_service.question_bank else 0
         
         dialog = tk.Toplevel(self.root)
         dialog.title("选择练习范围")
+        dialog.configure(bg=tc["bg"])
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -280,11 +302,12 @@ class PracticeModeWindow:
         y = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
         dialog.geometry(f"{dw}x{dh}+{x}+{y}")
         
-        tk.Label(dialog, text="选择练习范围", font=BOLD_FONT).pack(pady=(20, 15))
+        tk.Label(dialog, text="选择练习范围", font=BOLD_FONT,
+                 bg=tc["bg"], fg=tc["text"]).pack(pady=(20, 15))
         tk.Label(dialog, text=f"题库总量: {total} 题，已收藏: {collected} 题",
-                 font=DEFAULT_FONT).pack(pady=(0, 15))
+                 font=DEFAULT_FONT, bg=tc["bg"], fg=tc["text"]).pack(pady=(0, 15))
         
-        btn_frame = tk.Frame(dialog)
+        btn_frame = tk.Frame(dialog, bg=tc["bg"])
         btn_frame.pack(pady=10)
         
         def choose_all():
@@ -302,9 +325,13 @@ class PracticeModeWindow:
             self.start_practice_session("all")
         
         tk.Button(btn_frame, text="练习全部题目", font=DEFAULT_FONT,
-                  width=16, command=choose_all).pack(side='left', padx=15)
+                  width=16, bg=tc["bg_secondary"], fg=tc["text"],
+                  activebackground=tc["card_bg"], activeforeground=tc["text"],
+                  command=choose_all).pack(side='left', padx=15)
         tk.Button(btn_frame, text=f"只练收藏题 ({collected})", font=DEFAULT_FONT,
-                  width=16, command=choose_collected).pack(side='left', padx=15)
+                  width=16, bg=tc["bg_secondary"], fg=tc["text"],
+                  activebackground=tc["card_bg"], activeforeground=tc["text"],
+                  command=choose_collected).pack(side='left', padx=15)
         
         dialog.protocol("WM_DELETE_WINDOW", choose_all)
 
@@ -405,18 +432,22 @@ class PracticeModeWindow:
         
         no_question_label = tk.Label(self.question_container,
                                     text="没有找到符合条件的题目",
-                                    font=DEFAULT_FONT)
+                                    font=DEFAULT_FONT,
+                                    bg=get_theme_colors()["bg"],
+                                    fg=get_theme_colors()["text"])
         no_question_label.pack(expand=True)
     
     def show_answer_info(self, question: Question):
         """显示答案信息"""
-        answer_frame = tk.Frame(self.question_container, bg='lightyellow', 
+        tc = get_theme_colors()
+        answer_bg = tc["answer_bg"]
+        answer_frame = tk.Frame(self.question_container, bg=answer_bg, 
                                relief='solid', bd=1)
         answer_frame.pack(fill='both', expand=True, pady=(10, 0))
         
         # 正确答案标题
         answer_title = tk.Label(answer_frame, text="正确答案：",
-                               font=BOLD_FONT, bg='lightyellow', fg='green')
+                               font=BOLD_FONT, bg=answer_bg, fg=tc["correct_fg"])
         answer_title.pack(anchor='w', padx=10, pady=(5, 0))
         
         # 增大答案显示区域高度（最小4行，最大10行）
@@ -429,7 +460,8 @@ class PracticeModeWindow:
         from tkinter import scrolledtext
         answer_text = scrolledtext.ScrolledText(answer_frame, height=answer_height, 
                                                wrap=tk.WORD, font=DEFAULT_FONT, 
-                                               bg='lightyellow', fg='green',
+                                               bg=answer_bg, fg=tc["correct_fg"],
+                                               insertbackground=tc["text"],
                                                relief='flat', bd=0)
         answer_text.pack(fill='x', padx=10, pady=(0, 5))
         
@@ -442,7 +474,7 @@ class PracticeModeWindow:
         if question.explanation:
             # 解析标题
             explanation_title = tk.Label(answer_frame, text="解析：",
-                                       font=BOLD_FONT, bg='lightyellow', fg='blue')
+                                       font=BOLD_FONT, bg=answer_bg, fg=tc["primary"])
             explanation_title.pack(anchor='w', padx=10, pady=(5, 0))
             
             # 增大解析显示区域高度（最小4行，最大8行）
@@ -455,7 +487,8 @@ class PracticeModeWindow:
             from tkinter import scrolledtext
             explanation_text = scrolledtext.ScrolledText(answer_frame, height=explanation_height,
                                                        wrap=tk.WORD, font=DEFAULT_FONT,
-                                                       bg='lightyellow', fg='blue',
+                                                       bg=answer_bg, fg=tc["text"],
+                                                       insertbackground=tc["text"],
                                                        relief='flat', bd=0)
             explanation_text.pack(fill='both', expand=True, padx=10, pady=(0, 5))
             explanation_text.insert('1.0', question.explanation)
@@ -463,15 +496,15 @@ class PracticeModeWindow:
     
     def show_answer_info_with_result(self, question: Question, result: dict, user_answer: str):
         """显示答案信息和答题结果"""
+        tc = get_theme_colors()
         # 根据答题结果选择背景色
+        bg_color = tc["answer_bg"]
         if result['is_correct']:
-            bg_color = 'lightgreen'
             result_text = "✓ 回答正确！"
-            result_color = 'darkgreen'
+            result_color = tc["correct_fg"]
         else:
-            bg_color = 'lightcoral'
             result_text = "✗ 回答错误！"
-            result_color = 'darkred'
+            result_color = tc["wrong_fg"]
         
         answer_frame = tk.Frame(self.question_container, bg=bg_color, 
                                relief='solid', bd=2)
@@ -485,20 +518,20 @@ class PracticeModeWindow:
         # 用户答案（如果答错）
         if not result['is_correct']:
             user_answer_title = tk.Label(answer_frame, text="你的答案：",
-                                       font=BOLD_FONT, bg=bg_color, fg='darkred')
+                                       font=BOLD_FONT, bg=bg_color, fg=tc["wrong_fg"])
             user_answer_title.pack(anchor='w', padx=10, pady=(5, 0))
             
             # 转换判断题答案显示
             display_user_answer = self.convert_judge_answer_display(question, user_answer)
             
             user_answer_text = tk.Label(answer_frame, text=display_user_answer,
-                                      font=DEFAULT_FONT, bg=bg_color, fg='darkred',
+                                      font=DEFAULT_FONT, bg=bg_color, fg=tc["wrong_fg"],
                                       wraplength=600, justify='left')
             user_answer_text.pack(anchor='w', padx=10, pady=(0, 5))
         
         # 正确答案标题
         answer_title = tk.Label(answer_frame, text="正确答案：",
-                               font=BOLD_FONT, bg=bg_color, fg='darkgreen')
+                               font=BOLD_FONT, bg=bg_color, fg=tc["correct_fg"])
         answer_title.pack(anchor='w', padx=10, pady=(5, 0))
         
         # 增大答案显示区域高度（最小4行，最大10行）
@@ -511,7 +544,8 @@ class PracticeModeWindow:
         from tkinter import scrolledtext
         answer_text = scrolledtext.ScrolledText(answer_frame, height=answer_height, 
                                                wrap=tk.WORD, font=DEFAULT_FONT, 
-                                               bg=bg_color, fg='darkgreen',
+                                               bg=bg_color, fg=tc["correct_fg"],
+                                               insertbackground=tc["text"],
                                                relief='flat', bd=0)
         answer_text.pack(fill='x', padx=10, pady=(0, 5))
         
@@ -524,7 +558,7 @@ class PracticeModeWindow:
         if question.explanation:
             # 解析标题
             explanation_title = tk.Label(answer_frame, text="解析：",
-                                       font=BOLD_FONT, bg=bg_color, fg='blue')
+                                       font=BOLD_FONT, bg=bg_color, fg=tc["primary"])
             explanation_title.pack(anchor='w', padx=10, pady=(5, 0))
             
             # 增大解析显示区域高度（最小4行，最大8行）
@@ -537,7 +571,8 @@ class PracticeModeWindow:
             from tkinter import scrolledtext
             explanation_text = scrolledtext.ScrolledText(answer_frame, height=explanation_height,
                                                        wrap=tk.WORD, font=DEFAULT_FONT,
-                                                       bg=bg_color, fg='blue',
+                                                       bg=bg_color, fg=tc["text"],
+                                                       insertbackground=tc["text"],
                                                        relief='flat', bd=0)
             explanation_text.pack(fill='both', expand=True, padx=10, pady=(0, 5))
             explanation_text.insert('1.0', question.explanation)
@@ -660,12 +695,14 @@ class PracticeModeWindow:
         ]
         
         for label, value in info_items:
-            item_frame = tk.Frame(self.stats_container)
+            tc = get_theme_colors()
+            item_frame = tk.Frame(self.stats_container, bg=tc["bg"])
             item_frame.pack(fill='x', pady=2)
             
-            tk.Label(item_frame, text=f"{label}:", font=DEFAULT_FONT).pack(side='left')
+            tk.Label(item_frame, text=f"{label}:", font=DEFAULT_FONT,
+                     bg=tc["bg"], fg=tc["text"]).pack(side='left')
             tk.Label(item_frame, text=str(value), font=BOLD_FONT, 
-                    fg=COLORS['primary']).pack(side='right')
+                    bg=tc["bg"], fg=tc["primary"]).pack(side='right')
     
     def update_button_states(self):
         """更新按钮状态"""
@@ -725,25 +762,29 @@ class PracticeModeWindow:
     
     def show_search_results(self, results: list, keyword: str):
         """显示搜索结果"""
+        tc = get_theme_colors()
         result_window = tk.Toplevel(self.root)
         result_window.title(f"搜索结果 - '{keyword}'")
+        result_window.configure(bg=tc["bg"])
         center_window(result_window, 800, 600)
         
         # 结果列表
-        frame = tk.Frame(result_window)
+        frame = tk.Frame(result_window, bg=tc["bg"])
         frame.pack(fill='both', expand=True, padx=10, pady=10)
         
         tk.Label(frame, text=f"找到 {len(results)} 道相关题目：", 
-                font=BOLD_FONT).pack(anchor='w', pady=(0, 10))
+                font=BOLD_FONT, bg=tc["bg"], fg=tc["text"]).pack(anchor='w', pady=(0, 10))
         
         # 创建列表框
-        listbox_frame = tk.Frame(frame)
+        listbox_frame = tk.Frame(frame, bg=tc["bg"])
         listbox_frame.pack(fill='both', expand=True)
         
         scrollbar = ttk.Scrollbar(listbox_frame)
         scrollbar.pack(side='right', fill='y')
         
-        listbox = tk.Listbox(listbox_frame, yscrollcommand=scrollbar.set, font=DEFAULT_FONT)
+        listbox = tk.Listbox(listbox_frame, yscrollcommand=scrollbar.set, font=DEFAULT_FONT,
+                             bg=tc["bg_secondary"], fg=tc["text"],
+                             selectbackground=tc["primary"], selectforeground="#ffffff")
         listbox.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=listbox.yview)
         
@@ -767,7 +808,7 @@ class PracticeModeWindow:
         listbox.bind('<Double-1>', on_double_click)
         
         # 按钮
-        button_frame = tk.Frame(frame)
+        button_frame = tk.Frame(frame, bg=tc["bg"])
         button_frame.pack(fill='x', pady=(10, 0))
         
         ttk.Button(button_frame, text="跳转到选中题目",
@@ -927,13 +968,15 @@ class PracticeModeWindow:
         """更新收藏按钮状态"""
         current = self.question_service.get_current_question()
         if not current:
-            self.fav_btn.config(text="☆ 收藏", fg="black")
+            tc = get_theme_colors()
+            self.fav_btn.config(text="☆ 收藏", bg=tc["bg_secondary"], fg=tc["text"])
             return
         self._is_fav = current.is_collected
         if self._is_fav:
             self.fav_btn.config(text="★ 已收藏", fg="#e74c3c", font=BOLD_FONT)
         else:
-            self.fav_btn.config(text="☆ 收藏", fg="black", font=DEFAULT_FONT)
+            tc = get_theme_colors()
+            self.fav_btn.config(text="☆ 收藏", bg=tc["bg_secondary"], fg=tc["text"], font=DEFAULT_FONT)
 
     def _save_progress(self):
         """保存练习进度"""
