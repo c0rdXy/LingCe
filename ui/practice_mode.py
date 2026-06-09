@@ -43,12 +43,13 @@ class PracticeModeWindow:
         self.file_path = question_bank.file_path or ""
         self._is_fav = False
         self._collected_only = False  # 是否只练习收藏题目
+        self._practice_range = "all"
+        self._selected_question_type = "all"
+        self.range_var = tk.StringVar(value=self._practice_range)
 
         self.create_practice_interface()
         self.bind_keyboard_shortcuts()
-        
-        # 显示练习范围选择
-        self._show_practice_range_dialog()
+        self._start_initial_practice_session()
     
     def create_practice_interface(self):
         """创建练习界面"""
@@ -73,6 +74,7 @@ class PracticeModeWindow:
         right_frame.pack(side='right', fill='y', padx=(0, 10), pady=10)
         right_frame.pack_propagate(False)
 
+        self.create_range_area(right_frame)
         self.create_statistics_area(right_frame)
         self.create_search_area(right_frame)
 
@@ -156,24 +158,11 @@ class PracticeModeWindow:
     
     def create_question_area(self, parent):
         """创建题目显示区域（含右上角收藏按钮）"""
-        # 外层包装：收藏按钮独立于 question_container
         tc = get_theme_colors()
         self.question_area_wrapper = tk.Frame(parent, bg=tc["bg"])
         self.question_area_wrapper.pack(fill='both', expand=True, pady=(0, 10))
 
-        # 顶部工具栏（只放收藏按钮）
-        toolbar = tk.Frame(self.question_area_wrapper, bg=tc["bg"])
-        toolbar.pack(fill='x')
-
-        self.fav_btn = tk.Button(
-            toolbar, text="☆ 收藏",
-            font=DEFAULT_FONT, bd=1, relief="groove", cursor="hand2",
-            bg=tc["bg_secondary"], fg=tc["text"],
-            command=self.toggle_favorite,
-        )
-        self.fav_btn.pack(side='right', padx=10, pady=2)
-
-        # 题目容器（内容会被反复清空重建，不影响收藏按钮）
+        # 题目容器（内容会被反复清空重建）
         self.question_container = tk.Frame(self.question_area_wrapper, bg=tc["bg"])
         self.question_container.pack(fill='both', expand=True)
 
@@ -222,6 +211,34 @@ class PracticeModeWindow:
             command=self.submit_answer,
         )
         self.submit_btn.pack(side='left', padx=5)
+
+    def create_range_area(self, parent):
+        """创建练习范围选择区域"""
+        tc = get_theme_colors()
+        range_frame = tk.LabelFrame(parent, text="练习范围", font=BOLD_FONT,
+                                    bg=tc["bg"], fg=tc["text"])
+        range_frame.pack(fill='x', pady=(0, 10))
+
+        range_container = tk.Frame(range_frame, bg=tc["bg"])
+        range_container.pack(fill='x', padx=10, pady=10)
+
+        options = [
+            ("continue", "继续上次"),
+            ("all", "全部题目"),
+            ("collected", "仅收藏"),
+            ("wrong", "错题复习"),
+        ]
+
+        for value, text in options:
+            rb = ttk.Radiobutton(
+                range_container,
+                text=text,
+                value=value,
+                variable=self.range_var,
+                command=lambda v=value: self.change_practice_range(v),
+            )
+            rb.pack(anchor='w', pady=2)
+
     def create_statistics_area(self, parent):
         """创建统计区域"""
         tc = get_theme_colors()
@@ -281,72 +298,93 @@ class PracticeModeWindow:
                                 fg=get_theme_colors()["text"])
         loading_label.pack(expand=True)
     
-    def _show_practice_range_dialog(self):
-        """显示练习范围选择对话框"""
-        tc = get_theme_colors()
-        total = len(self.question_service.question_bank.questions) if self.question_service.question_bank else 0
-        collected = len(self.question_service.question_bank.get_collected_questions()) if self.question_service.question_bank else 0
-        
-        dialog = tk.Toplevel(self.root)
-        dialog.title("选择练习范围")
-        dialog.configure(bg=tc["bg"])
-        dialog.resizable(False, False)
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # 居中
-        dw, dh = 400, 220
-        dialog.geometry(f"{dw}x{dh}")
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
-        dialog.geometry(f"{dw}x{dh}+{x}+{y}")
-        
-        tk.Label(dialog, text="选择练习范围", font=BOLD_FONT,
-                 bg=tc["bg"], fg=tc["text"]).pack(pady=(20, 15))
-        tk.Label(dialog, text=f"题库总量: {total} 题，已收藏: {collected} 题",
-                 font=DEFAULT_FONT, bg=tc["bg"], fg=tc["text"]).pack(pady=(0, 15))
-        
-        btn_frame = tk.Frame(dialog, bg=tc["bg"])
-        btn_frame.pack(pady=10)
-        
-        def choose_all():
-            self._collected_only = False
-            dialog.destroy()
-            self.start_practice_session("all")
-        
-        def choose_collected():
-            if collected == 0:
-                from tkinter import messagebox
-                messagebox.showwarning("提示", "当前没有收藏的题目", parent=dialog)
+    def _start_initial_practice_session(self):
+        """进入练习模式时直接开始，不再弹出范围选择窗口。"""
+        progress = self.user_data.get_progress(self.file_path) if self.file_path else {}
+        if progress:
+            self._practice_range = "continue"
+            self.range_var.set("continue")
+            self._collected_only = progress.get("collected_only", False)
+            self._selected_question_type = progress.get("selected_type", "all")
+            if self.start_practice_session(self._selected_question_type, restore_progress=True):
                 return
-            self._collected_only = True
-            dialog.destroy()
-            self.start_practice_session("all")
-        
-        tk.Button(btn_frame, text="练习全部题目", font=DEFAULT_FONT,
-                  width=16, bg=tc["bg_secondary"], fg=tc["text"],
-                  activebackground=tc["card_bg"], activeforeground=tc["text"],
-                  command=choose_all).pack(side='left', padx=15)
-        tk.Button(btn_frame, text=f"只练收藏题 ({collected})", font=DEFAULT_FONT,
-                  width=16, bg=tc["bg_secondary"], fg=tc["text"],
-                  activebackground=tc["card_bg"], activeforeground=tc["text"],
-                  command=choose_collected).pack(side='left', padx=15)
-        
-        dialog.protocol("WM_DELETE_WINDOW", choose_all)
 
-    def start_practice_session(self, question_type: str):
+            self._practice_range = "all"
+            self.range_var.set("all")
+            self._collected_only = False
+            self._selected_question_type = "all"
+        else:
+            self._practice_range = "all"
+            self.range_var.set("all")
+            self._collected_only = False
+            self._selected_question_type = "all"
+        self.start_practice_session("all", restore_progress=False)
+
+    def change_practice_range(self, range_key: str):
+        """切换练习范围。"""
+        previous_range = self._practice_range
+        previous_collected = self._collected_only
+        previous_type = self._selected_question_type
+
+        try:
+            if range_key == "continue":
+                progress = self.user_data.get_progress(self.file_path) if self.file_path else {}
+                if not progress:
+                    show_message_dialog("提示", "暂无上次练习进度", "info")
+                    raise ValueError("no_progress")
+                self._practice_range = "continue"
+                self._collected_only = progress.get("collected_only", False)
+                self._selected_question_type = progress.get("selected_type", "all")
+                if not self.start_practice_session(self._selected_question_type, restore_progress=True):
+                    raise ValueError("start_failed")
+            elif range_key == "all":
+                self._practice_range = "all"
+                self._collected_only = False
+                question_type = "all" if self._selected_question_type == "wrong" else self._selected_question_type
+                if not self.start_practice_session(question_type, restore_progress=False):
+                    raise ValueError("start_failed")
+            elif range_key == "collected":
+                collected = (
+                    len(self.question_service.question_bank.get_collected_questions())
+                    if self.question_service.question_bank else 0
+                )
+                if collected == 0:
+                    show_message_dialog("提示", "当前没有收藏的题目", "info")
+                    raise ValueError("no_collected")
+                self._practice_range = "collected"
+                self._collected_only = True
+                question_type = "all" if self._selected_question_type == "wrong" else self._selected_question_type
+                if not self.start_practice_session(question_type, restore_progress=False):
+                    raise ValueError("start_failed")
+            elif range_key == "wrong":
+                self.review_wrong_questions(show_tip=False)
+            else:
+                return
+        except ValueError:
+            self._practice_range = previous_range
+            self._collected_only = previous_collected
+            self._selected_question_type = previous_type
+            self.range_var.set(previous_range)
+
+    def start_practice_session(self, question_type: str, restore_progress: bool = True) -> bool:
         """开始练习会话"""
+        previous_type = self._selected_question_type
         try:
             self.question_service.start_practice_session(question_type, self._collected_only)
-            self._restore_progress(question_type)
+            self._selected_question_type = question_type
+            if restore_progress:
+                self._restore_progress(question_type)
             self.show_current_question()
     
             self._update_fav_button()
+            self.range_var.set(self._practice_range)
             self.update_statistics_display()
             self.update_button_states()
+            return True
         except Exception as e:
+            self._selected_question_type = previous_type
             show_message_dialog("错误", f"启动练习失败：{str(e)}", "error")
+            return False
     
     def show_current_question(self):
         """显示当前题目"""
@@ -376,7 +414,11 @@ class PracticeModeWindow:
         }
         
         # 创建题目显示组件
-        self.question_display = QuestionDisplay(self.question_container, question_data)
+        self.question_display = QuestionDisplay(
+            self.question_container,
+            question_data,
+            title_action=self._create_fav_button,
+        )
         question_frame = self.question_display.create_question_frame()
         
         # 如果正在显示答案，压缩题目区域，增大答案区域
@@ -413,7 +455,11 @@ class PracticeModeWindow:
         }
         
         # 创建题目显示组件
-        self.question_display = QuestionDisplay(self.question_container, question_data)
+        self.question_display = QuestionDisplay(
+            self.question_container,
+            question_data,
+            title_action=self._create_fav_button,
+        )
         question_frame = self.question_display.create_question_frame()
         
         # 压缩题目区域，为答案区域留出更多空间
@@ -598,7 +644,11 @@ class PracticeModeWindow:
     
     def change_question_type(self, question_type: str):
         """切换题型"""
-        self.start_practice_session(question_type)
+        if self._practice_range == "wrong":
+            self._practice_range = "all"
+            self._collected_only = False
+            self.range_var.set("all")
+        self.start_practice_session(question_type, restore_progress=self._practice_range == "continue")
     
     def prev_question(self):
         """上一题"""
@@ -682,10 +732,8 @@ class PracticeModeWindow:
         filtered = stats.get('total_questions', 0)
         bank_total = stats.get('bank_total', filtered)
         total_text = f"{filtered}/{bank_total}" if filtered != bank_total else str(filtered)
-        range_label = "收藏题" if self._collected_only else "全部题目"
         
         info_items = [
-            ("练习范围", range_label),
             ("筛选题数", total_text),
             ("当前题号", f"{stats.get('current_index', 1)}/{filtered}"),
             ("已答题数", stats.get('answered_count', 0)),
@@ -823,15 +871,21 @@ class PracticeModeWindow:
             self.question_service.reset_practice_statistics()
             self.update_statistics_display()
     
-    def review_wrong_questions(self):
+    def review_wrong_questions(self, show_tip: bool = True):
         """复习错题"""
         if self.question_service.start_wrong_question_review():
+            self._practice_range = "wrong"
+            self.range_var.set("wrong")
+            self._collected_only = False
+            self._selected_question_type = "wrong"
             self.show_current_question()
             self.update_statistics_display()
             self.update_button_states()
             self._save_progress()
-            show_message_dialog("提示", "已切换到错题复习模式", "info")
+            if show_tip:
+                show_message_dialog("提示", "已切换到错题复习模式", "info")
         else:
+            self.range_var.set(self._practice_range)
             show_message_dialog("提示", "暂无错题可复习", "info")
     
     def shuffle_questions(self):
@@ -964,8 +1018,29 @@ class PracticeModeWindow:
             from core.utils import save_questions_to_file
             save_questions_to_file(self.question_service.question_bank, self.file_path)
 
+    def _create_fav_button(self, parent):
+        """在题目标题栏右侧创建收藏按钮。"""
+        tc = get_theme_colors()
+        self.fav_btn = tk.Button(
+            parent,
+            text="☆ 收藏",
+            font=DEFAULT_FONT,
+            bd=1,
+            relief="groove",
+            cursor="hand2",
+            bg=tc["bg_secondary"],
+            fg=tc["text"],
+            activebackground=tc["card_bg"],
+            activeforeground=tc["text"],
+            command=self.toggle_favorite,
+        )
+        self.fav_btn.pack(side='right', padx=10, pady=6)
+        self._update_fav_button()
+
     def _update_fav_button(self):
         """更新收藏按钮状态"""
+        if not hasattr(self, "fav_btn") or not self.fav_btn.winfo_exists():
+            return
         current = self.question_service.get_current_question()
         if not current:
             tc = get_theme_colors()
@@ -980,7 +1055,7 @@ class PracticeModeWindow:
 
     def _save_progress(self):
         """保存练习进度"""
-        if not self.file_path:
+        if not self.file_path or self._practice_range == "wrong":
             return
         stats = self.question_service.get_practice_statistics()
         self.user_data.save_progress(self.file_path, {

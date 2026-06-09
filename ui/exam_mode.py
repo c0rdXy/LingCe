@@ -177,8 +177,12 @@ class ExamModeWindow:
 
         nav = tk.Frame(ctrl, bg=tc["bg"])
         nav.pack(side="left", pady=10)
-        ttk.Button(nav, text="上一题 (←)", command=self.prev_question).pack(side="left", padx=5)
-        ttk.Button(nav, text="下一题 (→)", command=self.next_question).pack(side="left", padx=5)
+        style = ttk.Style(self.root)
+        style.configure("ExamNav.TButton", anchor="center", padding=(10, 4))
+        ttk.Button(nav, text="上一题", width=10, style="ExamNav.TButton",
+                   command=self.prev_question).pack(side="left", padx=5)
+        ttk.Button(nav, text="下一题", width=10, style="ExamNav.TButton",
+                   command=self.next_question).pack(side="left", padx=5)
 
         exam = tk.Frame(ctrl, bg=tc["bg"])
         exam.pack(side="right", pady=10)

@@ -13,9 +13,10 @@ from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, LAYOUT, get_theme_color
 class QuestionDisplay:
     """题目显示组件"""
     
-    def __init__(self, parent, question_data: Dict[str, Any]):
+    def __init__(self, parent, question_data: Dict[str, Any], title_action: Optional[Callable[[tk.Frame], None]] = None):
         self.parent = parent
         self.question_data = question_data
+        self.title_action = title_action
         self.answer_var = tk.StringVar()
         self.multi_vars = []
         self.short_text_widget = None
@@ -37,6 +38,9 @@ class QuestionDisplay:
         
         tk.Label(title_frame, text=title_text, font=BOLD_FONT,
                  background=tc["header_bg"], foreground=tc["header_fg"]).pack(side='left', padx=10, pady=8)
+
+        if self.title_action:
+            self.title_action(title_frame)
         
         # 题目内容
         content_frame = tk.Frame(frame, bg=tc["card_bg"])
