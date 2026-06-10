@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-106%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-108%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -80,9 +80,9 @@ LingCe/
 │   ├── edit_functions.py   # 编辑功能
 │   ├── settings_window.py  # 系统设置窗口
 │   └── stats_chart.py      # 统计图表
-├── data/                   # 题库数据
+├── data/                   # 题库与本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（101 个）
+├── tests/                  # 单元测试（108 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```
@@ -116,6 +116,22 @@ LingCe/
 ```
 
 支持 `single` / `multiple` / `judgement` / `fill` / `short` 五种题型。
+
+## 💾 本地数据
+
+- `data/题库.json` 是项目自带示例题库，首次运行且没有历史题库时会自动加载。
+- `data/user_data.json`、`data/settings.json`、`data/exam_history.db` 是运行时生成的本地数据，不参与 Git 提交。
+- `data/user_data.example.json` 是用户数据结构示例。
+
+## ✅ 发布检查
+
+发布前可运行：
+
+```bash
+python scripts/release_check.py
+```
+
+脚本会检查版本号一致性、运行数据是否被暂存、是否存在大文件/疑似乱码，并执行编译与测试。
 
 ## 🛠️ 技术栈
 

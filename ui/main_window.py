@@ -53,16 +53,28 @@ class MainWindow:
         # 尝试自动加载上次题库
     def _try_auto_load(self):
         """自动加载上次打开的题库"""
+        from pathlib import Path
+
         last_file = self.user_data.get_last_file()
-        if last_file:
-            from pathlib import Path
-            if Path(last_file).exists():
-                try:
-                    self.file_service.load_question_bank(last_file, show_messages=False)
-                    self.update_question_bank_info(self.file_service.question_bank)
-                    self.enable_function_buttons()
-                except Exception:
-                    pass
+        if last_file and Path(last_file).exists():
+            if self._load_question_bank_path(last_file):
+                return
+
+        sample_file = Path("data") / "题库.json"
+        if sample_file.exists():
+            self._load_question_bank_path(str(sample_file))
+
+    def _load_question_bank_path(self, file_path: str) -> bool:
+        """加载指定题库路径，成功后刷新主界面状态。"""
+        try:
+            question_bank = self.file_service.load_question_bank(file_path, show_messages=False)
+        except Exception:
+            return False
+        if not question_bank:
+            return False
+        self.update_question_bank_info(question_bank)
+        self.enable_function_buttons()
+        return True
 
     def setup_window(self):
         """设置窗口属性"""

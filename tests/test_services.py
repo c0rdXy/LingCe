@@ -323,6 +323,32 @@ class TestSettingsService(unittest.TestCase):
         self.assertTrue(SettingsService.question_matches_rule("essay", "short"))
         self.assertFalse(SettingsService.question_matches_rule("multiple", "single"))
 
+    def test_reset_to_defaults_persists_default_settings(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["app"]["name"] = "自定义系统"
+        service.save_settings(settings)
+
+        service.reset_to_defaults()
+
+        reloaded = SettingsService(self.settings_file)
+        self.assertEqual(reloaded.get_app_name(), "灵测 LingCe")
+
+    def test_export_and_import_settings(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["app"]["name"] = "导入导出测试"
+        service.save_settings(settings)
+
+        export_file = os.path.join(self.tmpdir.name, "exported-settings.json")
+        service.export_settings(export_file)
+
+        imported_file = os.path.join(self.tmpdir.name, "imported-settings.json")
+        imported = SettingsService(imported_file)
+        imported.import_settings(export_file)
+
+        self.assertEqual(imported.get_app_name(), "导入导出测试")
+
 
 class TestExamModeWindowLogic(unittest.TestCase):
     """ExamModeWindow 轻量逻辑测试"""

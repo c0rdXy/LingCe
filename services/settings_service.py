@@ -120,6 +120,25 @@ class SettingsService:
             json.dump(normalized, f, ensure_ascii=False, indent=2)
         self._settings = normalized
 
+    def reset_to_defaults(self):
+        """恢复并保存默认设置。"""
+        self.save_settings(get_default_settings())
+
+    def export_settings(self, file_path: str):
+        """导出当前设置到指定 JSON 文件。"""
+        target = Path(file_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            json.dump(self._settings, f, ensure_ascii=False, indent=2)
+
+    def import_settings(self, file_path: str):
+        """从 JSON 文件导入设置，导入前会执行完整校验。"""
+        with open(file_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        if not isinstance(settings, dict):
+            raise ValueError("设置文件格式错误：根节点必须是对象")
+        self.save_settings(settings)
+
     def validate_settings(self, settings: Optional[Dict[str, Any]] = None) -> List[str]:
         """返回设置校验错误列表。"""
         data = settings or self._settings

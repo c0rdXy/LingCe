@@ -3,7 +3,7 @@
 """系统设置窗口。"""
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from typing import Callable, Dict, Any
 
 from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors, THEMES
@@ -69,6 +69,9 @@ class SettingsWindow:
 
         footer = tk.Frame(self.window, bg=self.tc["bg"])
         footer.pack(fill="x", padx=15, pady=(0, 15))
+        ttk.Button(footer, text="恢复默认", command=self._reset_defaults).pack(side="left")
+        ttk.Button(footer, text="导入设置", command=self._import_settings).pack(side="left", padx=(8, 0))
+        ttk.Button(footer, text="导出设置", command=self._export_settings).pack(side="left", padx=(8, 0))
         ttk.Button(footer, text="保存", command=self._save).pack(side="right", padx=(8, 0))
         ttk.Button(footer, text="取消", command=self.window.destroy).pack(side="right")
 
@@ -172,6 +175,58 @@ class SettingsWindow:
         if self.on_saved:
             self.on_saved()
 
+    def _reset_defaults(self):
+        if not messagebox.askyesno(
+            "恢复默认",
+            "确定要恢复默认系统设置吗？当前设置会被覆盖。",
+            parent=self.window,
+        ):
+            return
+        try:
+            self.settings_service.reset_to_defaults()
+        except ValueError as exc:
+            messagebox.showerror("设置错误", str(exc), parent=self.window)
+            return
+        messagebox.showinfo("设置", "已恢复默认设置", parent=self.window)
+        self.window.destroy()
+        if self.on_saved:
+            self.on_saved()
+
+    def _export_settings(self):
+        file_path = filedialog.asksaveasfilename(
+            parent=self.window,
+            title="导出设置",
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+            initialfile="lingce-settings.json",
+        )
+        if not file_path:
+            return
+        try:
+            self.settings_service.export_settings(file_path)
+        except OSError as exc:
+            messagebox.showerror("导出失败", str(exc), parent=self.window)
+            return
+        messagebox.showinfo("导出设置", "设置已导出", parent=self.window)
+
+    def _import_settings(self):
+        file_path = filedialog.askopenfilename(
+            parent=self.window,
+            title="导入设置",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not file_path:
+            return
+        try:
+            self.settings_service.import_settings(file_path)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("导入失败", str(exc), parent=self.window)
+            return
+        messagebox.showinfo("导入设置", "设置已导入", parent=self.window)
+        self.window.destroy()
+        if self.on_saved:
+            self.on_saved()
+
     def _collect_settings(self) -> Dict[str, Any]:
         rules = []
         for rule_type, vars_ in self.rule_vars.items():
@@ -185,7 +240,7 @@ class SettingsWindow:
             })
 
         return {
-            "version": "0.0.6",
+            "version": "0.0.7",
             "app": {
                 "name": self.app_name_var.get().strip(),
                 "subtitle": self.subtitle_var.get().strip(),
