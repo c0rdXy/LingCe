@@ -8,15 +8,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any
 from core.config import (
-    WINDOW_TITLE, DEFAULT_WINDOW_SIZE, QUESTION_TYPES, get_font,
+    DEFAULT_WINDOW_SIZE, get_font,
     DEFAULT_FONT, BOLD_FONT, TITLE_FONT, COLORS,
     get_theme, set_theme, get_theme_colors, THEMES,
 )
 from services.file_service import FileService
 from services.user_data_service import UserDataService
+from services.settings_service import SettingsService
 from services.exam_db import init_db
 from ui.components import show_message_dialog, center_window
 from ui.exam_stats import show_exam_stats
+from ui.settings_window import show_settings_window
 
 
 class MainWindow:
@@ -27,6 +29,7 @@ class MainWindow:
         init_db()
         self.file_service = FileService()
         self.user_data = UserDataService()
+        self.settings_service = SettingsService()
         self.current_mode = None
 
         # 错题记录
@@ -37,7 +40,12 @@ class MainWindow:
         self.on_exam_mode = None
 
         # 恢复主题
-        set_theme(self.user_data.get_theme())
+        if self.settings_service.has_settings_file():
+            set_theme(self.settings_service.get_app_settings().get("default_theme", "light"))
+        else:
+            saved_theme = self.user_data.get_theme()
+            set_theme(saved_theme)
+            self.settings_service.set_runtime_default_theme(saved_theme)
 
         self.setup_window()
         self.create_main_interface()
@@ -58,7 +66,7 @@ class MainWindow:
 
     def setup_window(self):
         """设置窗口属性"""
-        self.root.title(WINDOW_TITLE)
+        self.root.title(self.settings_service.get_window_title())
         self.root.geometry(DEFAULT_WINDOW_SIZE)
         center_window(self.root, 1100, 750)
         self._apply_theme()
@@ -174,22 +182,43 @@ class MainWindow:
                 command=lambda t=theme_name: self._switch_theme(t),
             )
 
+        settings_menu = tk.Menu(
+            menubar,
+            tearoff=0,
+            bg=tc["bg_secondary"],
+            fg=tc["text"],
+            activebackground=tc["primary"],
+            activeforeground="#ffffff",
+        )
+        menubar.add_cascade(label="设置", menu=settings_menu)
+        settings_menu.add_command(label="系统设置", command=self.show_settings)
+
     def _switch_theme(self, theme_name: str):
         """切换主题"""
         set_theme(theme_name)
         self.user_data.set_theme(theme_name)
+        self._save_default_theme(theme_name)
         self._apply_theme()
         self.create_main_interface()
         if self.file_service.question_bank:
             self.update_question_bank_info(self.file_service.question_bank)
             self.enable_function_buttons()
 
+    def _save_default_theme(self, theme_name: str):
+        """同步保存默认主题设置。"""
+        try:
+            settings = self.settings_service.get_settings()
+            settings["app"]["default_theme"] = theme_name
+            self.settings_service.save_settings(settings)
+        except ValueError:
+            pass
+
     def _create_title(self, parent, tc):
         frame = tk.Frame(parent, bg=tc["bg"])
         frame.pack(fill="x", pady=(0, 30))
-        tk.Label(frame, text=WINDOW_TITLE, font=TITLE_FONT,
+        tk.Label(frame, text=self.settings_service.get_window_title(), font=TITLE_FONT,
                  bg=tc["bg"], fg=tc["primary"]).pack()
-        tk.Label(frame, text="通用考试练习平台",
+        tk.Label(frame, text=self.settings_service.get_app_subtitle(),
                  font=DEFAULT_FONT, bg=tc["bg"], fg=tc["text_secondary"]).pack(pady=(5, 0))
 
     def _create_bank_info(self, parent, tc):
@@ -248,6 +277,7 @@ class MainWindow:
 
         for text, cmd in [("使用说明", self.show_help),
                           ("统计面板", self.show_stats_panel),
+                          ("系统设置", self.show_settings),
                           ("切换主题", self._toggle_theme)]:
             tk.Button(btns, text=text, font=get_font(9),
                       bg=tc["header_bg"], fg=tc["header_fg"],
@@ -295,7 +325,7 @@ class MainWindow:
 
         total = sum(dist.values())
         for qtype, count in dist.items():
-            name = QUESTION_TYPES.get(qtype, qtype)
+            name = self.settings_service.get_question_type_name(qtype)
             pct = (count / total * 100) if total > 0 else 0
             f = tk.Frame(container, bg=tc["bg"])
             f.pack(side="left", padx=(0, 20))
@@ -364,9 +394,30 @@ class MainWindow:
         """显示统计面板（图表）"""
         show_exam_stats(self.root)
         return
+
+    def show_settings(self):
+        """显示系统设置窗口。"""
+        show_settings_window(self.root, self.settings_service, self._on_settings_saved)
+
+    def _on_settings_saved(self):
+        """设置保存后刷新主界面。"""
+        self.settings_service.reload()
+        default_theme = self.settings_service.get_app_settings().get("default_theme")
+        if default_theme in THEMES:
+            set_theme(default_theme)
+            self.user_data.set_theme(default_theme)
+        self._apply_theme()
+        self.create_main_interface()
+        if self.file_service.question_bank:
+            self.update_question_bank_info(self.file_service.question_bank)
+            self.enable_function_buttons()
+
     def show_help(self):
-        help_text = """
-灵测 LingCe 使用说明
+        app_name = self.settings_service.get_app_name()
+        exam = self.settings_service.get_exam_settings()
+        rule_lines = self._build_help_exam_rule_lines()
+        help_text = f"""
+{app_name} 使用说明
 
 ═══════════════════════════════════════
 
@@ -380,8 +431,8 @@ class MainWindow:
    • 支持收藏、标签
 
 3. 考试模式
-   • 20单选(2分) + 20多选(3分) + 4简答
-   • 限时90分钟，自动评分
+{rule_lines}
+   • 限时{exam.get("time_limit", 90)}分钟，自动评分
 
 4. 快捷键
    • ←/→ 上下题  R 随机题
@@ -402,12 +453,24 @@ class MainWindow:
         text_widget.config(state="disabled")
         ttk.Button(help_window, text="关闭", command=help_window.destroy).pack(pady=10)
 
+    def _build_help_exam_rule_lines(self) -> str:
+        """生成帮助窗口中的考试规则摘要。"""
+        lines = []
+        for rule in self.settings_service.get_exam_rules():
+            count = rule.get("count", 0)
+            score = rule.get("score", 0)
+            if rule.get("auto_score", True) and score > 0:
+                lines.append(f"   • {rule.get('name', rule['type'])}: {count}题 × {score:g}分")
+            else:
+                lines.append(f"   • {rule.get('name', rule['type'])}: {count}题，需人工评分")
+        return "\n".join(lines) or "   • 暂未配置考试题型"
+
     # ------------------------------------------------------------------ #
     #  导航
     # ------------------------------------------------------------------ #
 
     def return_to_main(self):
-        self.root.title(WINDOW_TITLE)
+        self.root.title(self.settings_service.get_window_title())
         self.current_mode = None
         self.create_main_interface()
 

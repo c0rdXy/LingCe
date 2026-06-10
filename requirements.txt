@@ -1,4 +1,4 @@
-# 灵测 LingCe V0.0.4
+# 灵测 LingCe V0.0.6
 # 当前仅使用 Python 标准库 (tkinter, json, pathlib, ...)
 #
 # 可选依赖（用于统计图表功能）:

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors
 from ui.components import center_window
-from services.exam_db import query_by_date, query_all, get_daily_avg
+from services.exam_db import query_by_date, query_all, get_daily_avg, clear_exam_records
 
 
 def _load_matplotlib():
@@ -62,6 +62,7 @@ class ExamStatsPanel:
 
         ttk.Button(bar, text="\u67e5\u8be2", command=self._do_query).pack(side="left", padx=(0, 10))
         ttk.Button(bar, text="\u67e5\u770b\u5168\u90e8", command=self._load_all).pack(side="left")
+        ttk.Button(bar, text="清除历史", command=self._clear_history).pack(side="right")
 
     def _create_treeview(self):
         tree_frame = tk.LabelFrame(self.window, text="\u8003\u8bd5\u8bb0\u5f55", font=BOLD_FONT,
@@ -116,6 +117,19 @@ class ExamStatsPanel:
         records = query_all()
         self._populate_tree(records)
         self._refresh_chart()
+
+    def _clear_history(self):
+        """清空考试统计历史记录。"""
+        if not messagebox.askyesno(
+            "确认清除",
+            "确定要清除全部考试统计历史记录吗？\n\n此操作不可恢复。",
+            parent=self.window,
+        ):
+            return
+        clear_exam_records()
+        self._populate_tree([])
+        self._refresh_chart()
+        messagebox.showinfo("清除完成", "考试统计历史记录已清除。", parent=self.window)
 
     def _populate_tree(self, records):
         for item in self.tree.get_children():

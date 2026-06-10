@@ -17,6 +17,8 @@ from core.utils import (
     calculate_remaining_time,
     format_remaining_time,
     validate_answer,
+    normalize_judge_answer,
+    format_judge_answer,
     get_question_type_name,
     generate_exam_questions,
     get_statistics_summary,
@@ -98,9 +100,17 @@ class TestValidateAnswer(unittest.TestCase):
 
     def test_judge_correct(self):
         q = Question(id=1, type="judge", question="?", answer="A")
-        # Judge validation depends on normalization
-        result = validate_answer(q, "A")
-        self.assertIsInstance(result, bool)
+        self.assertTrue(validate_answer(q, "A"))
+
+    def test_judge_chinese_answer_matches_option_b(self):
+        q = Question(id=1, type="judge", question="?", answer="错误")
+        self.assertTrue(validate_answer(q, "B"))
+
+    def test_judge_answer_helpers(self):
+        self.assertEqual(normalize_judge_answer("错误"), "B")
+        self.assertEqual(normalize_judge_answer("正确"), "A")
+        self.assertEqual(format_judge_answer("B"), "错误")
+        self.assertEqual(format_judge_answer("A"), "正确")
 
 
 class TestFormatTime(unittest.TestCase):

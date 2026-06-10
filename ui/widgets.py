@@ -9,6 +9,7 @@ from tkinter import ttk, scrolledtext
 from typing import List, Dict, Any, Optional, Callable
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_theme_colors
 from core.models import Question
+from core.utils import format_judge_answer, normalize_judge_answer
 
 
 # ---------------------------------------------------------------------------
@@ -239,11 +240,13 @@ class QuestionWidget:
         judge_frame.pack(anchor="w", pady=10)
 
         if self.review_mode:
-            fg_true = "green" if self.correct_answer.upper() in ("A", "√", "正确") else tc["text"]
-            fg_false = "green" if self.correct_answer.upper() in ("B", "×", "错误") else tc["text"]
-            if self.user_answer.upper() == "A" and fg_true != "green":
+            correct = normalize_judge_answer(self.correct_answer)
+            user = normalize_judge_answer(self.user_answer)
+            fg_true = "green" if correct == "A" else tc["text"]
+            fg_false = "green" if correct == "B" else tc["text"]
+            if user == "A" and fg_true != "green":
                 fg_true = "red"
-            if self.user_answer.upper() == "B" and fg_false != "green":
+            if user == "B" and fg_false != "green":
                 fg_false = "red"
 
             tk.Label(judge_frame, text="正确", font=DEFAULT_FONT,
@@ -283,25 +286,40 @@ class QuestionWidget:
         analysis_bg = tc["answer_bg"]
         analysis_frame = tk.Frame(parent, bg=analysis_bg, relief="solid", bd=1)
         analysis_frame.pack(fill="x", pady=(15, 5))
+        is_text_answer = self.question.type in ("fill", "short", "essay")
 
         # 正确答案
-        answer_frame = tk.Frame(analysis_frame, bg=analysis_bg)
-        answer_frame.pack(fill="x", padx=10, pady=5)
-        tk.Label(answer_frame, text="正确答案：", font=BOLD_FONT,
-                 bg=analysis_bg, fg=tc["text"]).pack(side="left")
-        tk.Label(answer_frame, text=self.correct_answer, font=DEFAULT_FONT,
-                 fg=tc["correct_fg"], bg=analysis_bg).pack(side="left")
+        correct_text = self._format_answer_for_display(self.correct_answer)
+        if is_text_answer:
+            self._render_answer_text_block(
+                analysis_frame, "正确答案：", correct_text,
+                title_fg=tc["correct_fg"], text_fg=tc["correct_fg"], bg=analysis_bg,
+            )
+        else:
+            answer_frame = tk.Frame(analysis_frame, bg=analysis_bg)
+            answer_frame.pack(fill="x", padx=10, pady=5)
+            tk.Label(answer_frame, text="正确答案：", font=BOLD_FONT,
+                     bg=analysis_bg, fg=tc["text"]).pack(side="left")
+            tk.Label(answer_frame, text=correct_text, font=DEFAULT_FONT,
+                     fg=tc["correct_fg"], bg=analysis_bg).pack(side="left")
 
         # 用户答案
         if self.user_answer:
             is_correct = self._check_correct()
             user_fg = "green" if is_correct else "red"
-            user_frame = tk.Frame(analysis_frame, bg=analysis_bg)
-            user_frame.pack(fill="x", padx=10, pady=5)
-            tk.Label(user_frame, text="你的答案：", font=BOLD_FONT,
-                     bg=analysis_bg, fg=tc["text"]).pack(side="left")
-            tk.Label(user_frame, text=self.user_answer, font=DEFAULT_FONT,
-                     fg=user_fg, bg=analysis_bg).pack(side="left")
+            user_text = self._format_answer_for_display(self.user_answer)
+            if is_text_answer:
+                self._render_answer_text_block(
+                    analysis_frame, "你的答案：", user_text,
+                    title_fg=user_fg, text_fg=user_fg, bg=analysis_bg,
+                )
+            else:
+                user_frame = tk.Frame(analysis_frame, bg=analysis_bg)
+                user_frame.pack(fill="x", padx=10, pady=5)
+                tk.Label(user_frame, text="你的答案：", font=BOLD_FONT,
+                         bg=analysis_bg, fg=tc["text"]).pack(side="left")
+                tk.Label(user_frame, text=user_text, font=DEFAULT_FONT,
+                         fg=user_fg, bg=analysis_bg).pack(side="left")
 
         # 解析
         if self.question.explanation:
@@ -316,6 +334,30 @@ class QuestionWidget:
             expl_text.insert("1.0", self.question.explanation)
             expl_text.config(state="disabled")
 
+    def _render_answer_text_block(self, parent, title: str, content: str,
+                                  title_fg: str, text_fg: str, bg: str):
+        """渲染多行答案块，用于填空/简答/问答回顾。"""
+        tk.Label(parent, text=title, font=BOLD_FONT,
+                 bg=bg, fg=title_fg).pack(anchor="w", padx=10, pady=(6, 0))
+
+        height = self._answer_block_height(content)
+        text = scrolledtext.ScrolledText(
+            parent, height=height, wrap=tk.WORD, font=DEFAULT_FONT,
+            relief="flat", bd=0, bg=bg, fg=text_fg,
+            insertbackground=get_theme_colors()["text"],
+        )
+        text.pack(fill="x", padx=10, pady=(0, 5))
+        text.insert("1.0", content)
+        text.config(state="disabled")
+
+    @staticmethod
+    def _answer_block_height(content: str) -> int:
+        """根据内容长度估算答案块高度。"""
+        text = content or ""
+        newline_count = text.count("\n")
+        char_lines = len(text) // 80
+        return max(3, min(10, newline_count + char_lines + 1))
+
     def _check_correct(self) -> bool:
         """检查用户答案是否正确"""
         if not self.user_answer:
@@ -325,11 +367,19 @@ class QuestionWidget:
         qtype = self.question.type
 
         if qtype == "single" or qtype in ("judge", "judgement"):
+            if qtype in ("judge", "judgement"):
+                return normalize_judge_answer(ua) == normalize_judge_answer(ca)
             return ua == ca
         elif qtype == "multiple":
             return sorted(ua) == sorted(ca)
         else:
             return ua == ca
+
+    def _format_answer_for_display(self, answer: str) -> str:
+        """将内部答案转换成回顾页展示文本。"""
+        if self.question.type in ("judge", "judgement"):
+            return format_judge_answer(answer)
+        return answer
 
     @staticmethod
     def _update_wraplength(label: tk.Label, container: tk.Frame):

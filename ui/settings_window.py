@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""系统设置窗口。"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+from typing import Callable, Dict, Any
+
+from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors, THEMES
+from services.settings_service import SettingsService
+from ui.components import center_window
+
+
+def show_settings_window(parent: tk.Tk, settings_service: SettingsService,
+                         on_saved: Callable[[], None] = None):
+    """显示系统设置窗口。"""
+    SettingsWindow(parent, settings_service, on_saved)
+
+
+class SettingsWindow:
+    """系统设置编辑窗口。"""
+
+    def __init__(self, parent: tk.Tk, settings_service: SettingsService,
+                 on_saved: Callable[[], None] = None):
+        self.parent = parent
+        self.settings_service = settings_service
+        self.on_saved = on_saved
+        self.settings = settings_service.get_settings()
+        self.rule_vars: Dict[str, Dict[str, Any]] = {}
+        self.tc = get_theme_colors()
+
+        self.window = tk.Toplevel(parent)
+        self.window.title("系统设置")
+        self.window.configure(bg=self.tc["bg"])
+        self.window.transient(parent)
+        self.window.grab_set()
+        center_window(self.window, 680, 560)
+
+        self._create_vars()
+        self._create_ui()
+
+    def _create_vars(self):
+        app = self.settings["app"]
+        exam = self.settings["exam"]
+        self.app_name_var = tk.StringVar(value=app.get("name", ""))
+        self.subtitle_var = tk.StringVar(value=app.get("subtitle", ""))
+        self.show_version_var = tk.BooleanVar(value=app.get("show_version", True))
+        self.theme_var = tk.StringVar(value=app.get("default_theme", "light"))
+        self.time_limit_var = tk.StringVar(value=str(exam.get("time_limit", 90)))
+        self.pass_score_var = tk.StringVar(value=str(exam.get("pass_score", 60)))
+        self.allow_unanswered_var = tk.BooleanVar(
+            value=exam.get("allow_submit_with_unanswered", True)
+        )
+        self.auto_submit_var = tk.BooleanVar(
+            value=exam.get("auto_submit_when_time_up", False)
+        )
+
+    def _create_ui(self):
+        notebook = ttk.Notebook(self.window)
+        notebook.pack(fill="both", expand=True, padx=15, pady=15)
+
+        app_tab = tk.Frame(notebook, bg=self.tc["bg"])
+        exam_tab = tk.Frame(notebook, bg=self.tc["bg"])
+        notebook.add(app_tab, text="基础设置")
+        notebook.add(exam_tab, text="考试设置")
+
+        self._create_app_tab(app_tab)
+        self._create_exam_tab(exam_tab)
+
+        footer = tk.Frame(self.window, bg=self.tc["bg"])
+        footer.pack(fill="x", padx=15, pady=(0, 15))
+        ttk.Button(footer, text="保存", command=self._save).pack(side="right", padx=(8, 0))
+        ttk.Button(footer, text="取消", command=self.window.destroy).pack(side="right")
+
+    def _create_app_tab(self, parent):
+        form = tk.Frame(parent, bg=self.tc["bg"])
+        form.pack(fill="x", padx=20, pady=20)
+
+        self._add_labeled_entry(form, "系统名称", self.app_name_var, 0)
+        self._add_labeled_entry(form, "首页副标题", self.subtitle_var, 1)
+
+        tk.Label(form, text="默认主题", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=2, column=0, sticky="w", pady=8)
+        theme_box = ttk.Combobox(
+            form,
+            textvariable=self.theme_var,
+            values=list(THEMES.keys()),
+            state="readonly",
+            width=18,
+        )
+        theme_box.grid(row=2, column=1, sticky="w", pady=8)
+
+        ttk.Checkbutton(form, text="窗口标题显示版本号",
+                        variable=self.show_version_var).grid(
+            row=3, column=1, sticky="w", pady=8
+        )
+
+    def _create_exam_tab(self, parent):
+        top = tk.Frame(parent, bg=self.tc["bg"])
+        top.pack(fill="x", padx=20, pady=(20, 10))
+
+        self._add_labeled_entry(top, "考试时长（分钟）", self.time_limit_var, 0)
+        self._add_labeled_entry(top, "及格分", self.pass_score_var, 1)
+
+        ttk.Checkbutton(top, text="允许未答题时提交",
+                        variable=self.allow_unanswered_var).grid(
+            row=2, column=1, sticky="w", pady=8
+        )
+        ttk.Checkbutton(top, text="时间到后自动提交",
+                        variable=self.auto_submit_var).grid(
+            row=3, column=1, sticky="w", pady=8
+        )
+
+        rules_frame = tk.LabelFrame(parent, text="题型与分值", font=BOLD_FONT,
+                                    bg=self.tc["bg"], fg=self.tc["text"])
+        rules_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        header = tk.Frame(rules_frame, bg=self.tc["bg"])
+        header.pack(fill="x", padx=10, pady=(10, 4))
+        for text, width in [("启用", 6), ("题型", 12), ("题数", 10), ("每题分值", 10), ("自动评分", 10)]:
+            tk.Label(header, text=text, width=width, font=get_font(9, "bold"),
+                     bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left")
+
+        existing = {rule["type"]: rule for rule in self.settings_service.get_exam_settings()["rules"]}
+        for item in self.settings_service.get_supported_rule_types():
+            rule = existing.get(item["type"], {
+                "type": item["type"], "name": item["name"], "count": 0,
+                "score": 0, "auto_score": item["type"] != "short",
+            })
+            self._add_rule_row(rules_frame, rule)
+
+    def _add_labeled_entry(self, parent, label, variable, row):
+        tk.Label(parent, text=label, font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=row, column=0, sticky="w", pady=8)
+        ttk.Entry(parent, textvariable=variable, width=30).grid(
+            row=row, column=1, sticky="w", pady=8, padx=(10, 0)
+        )
+
+    def _add_rule_row(self, parent, rule):
+        row = tk.Frame(parent, bg=self.tc["bg"])
+        row.pack(fill="x", padx=10, pady=3)
+        enabled = tk.BooleanVar(value=rule.get("count", 0) > 0)
+        count_var = tk.StringVar(value=str(rule.get("count", 0)))
+        score_var = tk.StringVar(value=str(rule.get("score", 0)))
+        auto_score = tk.BooleanVar(value=rule.get("auto_score", True))
+
+        ttk.Checkbutton(row, variable=enabled).pack(side="left", padx=(8, 18))
+        tk.Label(row, text=rule.get("name", rule["type"]), width=12,
+                 bg=self.tc["bg"], fg=self.tc["text"], anchor="w").pack(side="left")
+        ttk.Entry(row, textvariable=count_var, width=8).pack(side="left", padx=(8, 22))
+        ttk.Entry(row, textvariable=score_var, width=8).pack(side="left", padx=(0, 28))
+        ttk.Checkbutton(row, variable=auto_score).pack(side="left")
+
+        self.rule_vars[rule["type"]] = {
+            "enabled": enabled,
+            "name": rule.get("name", rule["type"]),
+            "count": count_var,
+            "score": score_var,
+            "auto_score": auto_score,
+        }
+
+    def _save(self):
+        try:
+            settings = self._collect_settings()
+            self.settings_service.save_settings(settings)
+        except (TypeError, ValueError) as exc:
+            messagebox.showerror("设置错误", str(exc), parent=self.window)
+            return
+
+        messagebox.showinfo("设置", "设置已保存", parent=self.window)
+        self.window.destroy()
+        if self.on_saved:
+            self.on_saved()
+
+    def _collect_settings(self) -> Dict[str, Any]:
+        rules = []
+        for rule_type, vars_ in self.rule_vars.items():
+            count = vars_["count"].get() or "0" if vars_["enabled"].get() else 0
+            rules.append({
+                "type": rule_type,
+                "name": vars_["name"],
+                "count": count,
+                "score": vars_["score"].get() or "0",
+                "auto_score": vars_["auto_score"].get(),
+            })
+
+        return {
+            "version": "0.0.6",
+            "app": {
+                "name": self.app_name_var.get().strip(),
+                "subtitle": self.subtitle_var.get().strip(),
+                "show_version": self.show_version_var.get(),
+                "default_theme": self.theme_var.get(),
+            },
+            "exam": {
+                "name": "默认考试",
+                "time_limit": self.time_limit_var.get() or "0",
+                "pass_score": self.pass_score_var.get() or "0",
+                "allow_submit_with_unanswered": self.allow_unanswered_var.get(),
+                "auto_submit_when_time_up": self.auto_submit_var.get(),
+                "rules": rules,
+            },
+        }

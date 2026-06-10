@@ -76,3 +76,11 @@ def get_daily_avg() -> List[Dict[str, Any]]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def clear_exam_records():
+    """清空全部考试统计记录。"""
+    conn = _get_conn()
+    conn.execute("DELETE FROM exam_records")
+    conn.commit()
+    conn.close()

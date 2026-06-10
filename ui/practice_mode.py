@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, Callable
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES, get_theme_colors
 from core.models import QuestionBank, Question
 from services.question_service import QuestionService
+from services.settings_service import SettingsService
 from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog, center_window
 from ui.widgets import get_question_type_name
 from services.user_data_service import UserDataService
@@ -23,6 +24,7 @@ class PracticeModeWindow:
         self.root = root
         self.question_service = QuestionService()
         self.question_service.set_question_bank(question_bank)
+        self.settings_service = SettingsService()
         
         # 界面组件
         self.question_display = None
@@ -55,7 +57,7 @@ class PracticeModeWindow:
         """创建练习界面"""
         tc = get_theme_colors()
         # 设置窗口标题
-        self.root.title("灵测 LingCe - 练习模式")
+        self.root.title(self.settings_service.get_window_title("练习模式"))
         self.root.configure(bg=tc["bg"])
         
         # 清空窗口

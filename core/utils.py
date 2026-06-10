@@ -117,24 +117,30 @@ def validate_answer(question: Question, user_answer: str) -> bool:
         user_options = sorted(list(user_answer))
         return correct_options == user_options
     elif question.type in ['judge', 'judgement']:
-        # 判断题：需要转换A/B到正确/错误
-        # 标准化用户答案
-        if user_answer == 'A':
-            user_answer = '正确'
-        elif user_answer == 'B':
-            user_answer = '错误'
-        
-        # 标准化正确答案
-        normalized_correct = correct_answer
-        if correct_answer in ['√', 'TRUE', 'T', '对']:
-            normalized_correct = '正确'
-        elif correct_answer in ['×', 'FALSE', 'F', '错']:
-            normalized_correct = '错误'
-        
-        return normalized_correct == user_answer
+        return normalize_judge_answer(correct_answer) == normalize_judge_answer(user_answer)
     else:
         # 单选题、简答题：直接比较
         return correct_answer == user_answer
+
+
+def normalize_judge_answer(answer: str) -> str:
+    """将判断题答案统一为 A/B，无法识别时返回清理后的原值。"""
+    value = str(answer or "").strip().upper()
+    if value in {"A", "TRUE", "T", "√", "✓", "对", "正确", "YES", "Y", "1"}:
+        return "A"
+    if value in {"B", "FALSE", "F", "×", "✗", "错", "错误", "NO", "N", "0"}:
+        return "B"
+    return value
+
+
+def format_judge_answer(answer: str) -> str:
+    """将判断题内部答案显示为用户可读文本。"""
+    normalized = normalize_judge_answer(answer)
+    if normalized == "A":
+        return "正确"
+    if normalized == "B":
+        return "错误"
+    return str(answer or "")
 
 
 def get_question_type_name(question_type: str) -> str:

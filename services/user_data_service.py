@@ -55,7 +55,7 @@ class UserDataService:
     def _default_data() -> Dict[str, Any]:
         """返回新的默认用户数据结构。"""
         return {
-            "version": "0.0.4",
+            "version": "0.0.6",
             "last_file": "",
             "theme": "light",
             "progress": {},

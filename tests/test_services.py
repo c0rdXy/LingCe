@@ -6,11 +6,15 @@ import unittest
 import tempfile
 import os
 import json
+from pathlib import Path
 
 from core.models import Question, QuestionBank
 from services.exam_service import ExamService
 from services.file_service import FileService
 from services.user_data_service import UserDataService
+from services.settings_service import SettingsService
+import services.exam_db as exam_db
+from ui.exam_mode import ExamModeWindow
 
 
 class TestExamService(unittest.TestCase):
@@ -253,6 +257,115 @@ class TestUserDataService(unittest.TestCase):
         self.assertTrue(ud2.is_favorite("bank.json", 42))
         stats = ud2.get_stats()
         self.assertEqual(stats["total_answered"], 5)
+
+
+class TestSettingsService(unittest.TestCase):
+    """SettingsService 测试"""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_file = os.path.join(self.tmpdir.name, "settings.json")
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_default_settings_when_file_missing(self):
+        service = SettingsService(self.settings_file)
+        self.assertEqual(service.get_app_name(), "灵测 LingCe")
+        rules = service.get_exam_rules()
+        self.assertEqual([r["type"] for r in rules], ["single", "multiple", "short"])
+
+    def test_save_and_reload_settings(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["app"]["name"] = "自定义系统"
+        settings["exam"]["time_limit"] = 45
+        settings["exam"]["rules"] = [
+            {"type": "single", "name": "单选题", "count": 5, "score": 4, "auto_score": True}
+        ]
+        service.save_settings(settings)
+
+        reloaded = SettingsService(self.settings_file)
+        self.assertEqual(reloaded.get_app_name(), "自定义系统")
+        self.assertEqual(reloaded.get_exam_settings()["time_limit"], 45)
+        self.assertEqual(reloaded.get_exam_rules()[0]["count"], 5)
+
+    def test_invalid_json_falls_back_to_defaults(self):
+        with open(self.settings_file, "w", encoding="utf-8") as f:
+            f.write("{invalid json")
+
+        service = SettingsService(self.settings_file)
+        self.assertEqual(service.get_app_subtitle(), "通用考试练习平台")
+
+    def test_validation_rejects_empty_app_name(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["app"]["name"] = ""
+        with self.assertRaises(ValueError):
+            service.save_settings(settings)
+
+    def test_validation_rejects_negative_rule_count(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["exam"]["rules"][0]["count"] = -1
+        with self.assertRaises(ValueError):
+            service.save_settings(settings)
+
+    def test_validation_rejects_non_numeric_score(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["exam"]["rules"][0]["score"] = "abc"
+        with self.assertRaises(ValueError):
+            service.save_settings(settings)
+
+    def test_question_type_alias_matching(self):
+        self.assertTrue(SettingsService.question_matches_rule("judgement", "judge"))
+        self.assertTrue(SettingsService.question_matches_rule("essay", "short"))
+        self.assertFalse(SettingsService.question_matches_rule("multiple", "single"))
+
+
+class TestExamModeWindowLogic(unittest.TestCase):
+    """ExamModeWindow 轻量逻辑测试"""
+
+    def test_review_mode_does_not_overwrite_saved_answer(self):
+        window = ExamModeWindow.__new__(ExamModeWindow)
+        window.is_review_mode = True
+        window.current_question = Question(id=1, type="judge", question="Q", answer="A")
+        window._question_widget = object()
+        window.exam_answers = {1: "B"}
+
+        window._save_current_answer()
+
+        self.assertEqual(window.exam_answers[1], "B")
+
+    def test_judge_option_b_matches_chinese_wrong_answer(self):
+        question = Question(id=1, type="judge", question="Q", answer="错误")
+        self.assertTrue(ExamModeWindow._check_correct(question, "B", question.answer))
+
+
+class TestExamDbService(unittest.TestCase):
+    """考试统计数据库服务测试"""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.old_db_dir = exam_db.DB_DIR
+        self.old_db_file = exam_db.DB_FILE
+        exam_db.DB_DIR = Path(self.tmpdir.name)
+        exam_db.DB_FILE = exam_db.DB_DIR / "exam_history.db"
+
+    def tearDown(self):
+        exam_db.DB_DIR = self.old_db_dir
+        exam_db.DB_FILE = self.old_db_file
+        self.tmpdir.cleanup()
+
+    def test_clear_exam_records(self):
+        exam_db.init_db()
+        exam_db.save_exam_record(80, 10, 8)
+        self.assertEqual(len(exam_db.query_all()), 1)
+
+        exam_db.clear_exam_records()
+
+        self.assertEqual(exam_db.query_all(), [])
 
 
 if __name__ == "__main__":

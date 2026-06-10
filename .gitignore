@@ -36,3 +36,4 @@ dist_secure/
 
 # User data
 data/exam_history.db
+data/settings.json
