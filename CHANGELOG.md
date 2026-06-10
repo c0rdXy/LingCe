@@ -1,5 +1,14 @@
 # Changelog
 
+## V0.0.8
+
+- 解决一些已知 BUG。
+- Fix practice range persistence after returning to the main screen.
+- Keep "continue last" and range selection from overwriting each other.
+- Restore wrong-question review from saved history after re-entering practice mode.
+- Add the official GitHub icon on the home screen with a Star prompt tooltip.
+- Remove obsolete no-op/commented code left from earlier iterations.
+
 ## V0.0.7
 
 - Stop tracking local runtime data and keep `data/user_data.json` ignored.

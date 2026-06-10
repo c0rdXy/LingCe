@@ -355,7 +355,6 @@ class ExamModeWindow:
 
         self._update_progress()
         self._update_answer_status()
-        self._update_nav_buttons()
 
     def _save_current_answer(self):
         if self.is_review_mode or not self.current_question or not self._question_widget:
@@ -452,10 +451,6 @@ class ExamModeWindow:
             self.answered_label.config(text=f"已答: {answered}/{total}")
         if self.unanswered_label:
             self.unanswered_label.config(text=f"未答: {total - answered}/{total}")
-
-    def _update_nav_buttons(self):
-        """导航按钮始终可用，无需动态状态更新。"""
-        pass
 
     def _style_status_button(self, btn: tk.Button, bg: str, current: bool = False):
         """设置答题状态按钮样式，当前题不改变尺寸以避免挤压网格。"""

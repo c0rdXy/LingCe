@@ -172,12 +172,16 @@ class QuestionService:
     def start_wrong_question_review(self) -> bool:
         """开始错题复习"""
         wrong_questions = self.get_wrong_questions()
-        if not wrong_questions:
+        return self.start_review_session(wrong_questions, "wrong")
+
+    def start_review_session(self, questions: List[Question], selected_type: str = "wrong") -> bool:
+        """使用指定题目列表开始复习会话。"""
+        if not questions:
             return False
-        
+
         self.practice_session = PracticeSession(
-            questions=wrong_questions,
-            selected_type="wrong"
+            questions=list(questions),
+            selected_type=selected_type
         )
         return True
     

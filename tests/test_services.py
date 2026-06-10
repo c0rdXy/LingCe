@@ -11,6 +11,7 @@ from pathlib import Path
 from core.models import Question, QuestionBank
 from services.exam_service import ExamService
 from services.file_service import FileService
+from services.question_service import QuestionService
 from services.user_data_service import UserDataService
 from services.settings_service import SettingsService
 import services.exam_db as exam_db
@@ -348,6 +349,26 @@ class TestSettingsService(unittest.TestCase):
         imported.import_settings(export_file)
 
         self.assertEqual(imported.get_app_name(), "导入导出测试")
+
+
+class TestQuestionService(unittest.TestCase):
+    """QuestionService 测试"""
+
+    def test_start_review_session_uses_given_questions(self):
+        service = QuestionService()
+        questions = [
+            Question(id=1, type="single", question="Q1", options=["A. X", "B. Y"], answer="A"),
+            Question(id=2, type="single", question="Q2", options=["A. X", "B. Y"], answer="B"),
+        ]
+
+        self.assertTrue(service.start_review_session(questions, "wrong"))
+        self.assertEqual(service.get_practice_statistics()["total_questions"], 2)
+        self.assertEqual(service.get_practice_statistics()["selected_type"], "wrong")
+
+    def test_start_review_session_rejects_empty_list(self):
+        service = QuestionService()
+
+        self.assertFalse(service.start_review_session([], "wrong"))
 
 
 class TestExamModeWindowLogic(unittest.TestCase):

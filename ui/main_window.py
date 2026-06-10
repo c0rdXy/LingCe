@@ -5,6 +5,9 @@
 """
 
 import tkinter as tk
+import webbrowser
+import sys
+from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any
 from core.config import (
@@ -21,6 +24,10 @@ from ui.exam_stats import show_exam_stats
 from ui.settings_window import show_settings_window
 
 
+GITHUB_URL = "https://github.com/c0rdXy/LingCe"
+GITHUB_ICON_PATH = Path("assets") / "github-fluidicon.png"
+
+
 class MainWindow:
     """主窗口类"""
 
@@ -31,6 +38,7 @@ class MainWindow:
         self.user_data = UserDataService()
         self.settings_service = SettingsService()
         self.current_mode = None
+        self.github_tooltip = None
 
         # 错题记录
         self.wrong_questions_history = []
@@ -144,6 +152,7 @@ class MainWindow:
 
         outer = tk.Frame(self.root, bg=bg)
         outer.pack(fill="both", expand=True)
+        self._create_github_link(outer, tc)
 
         main = tk.Frame(outer, bg=bg)
         main.place(relx=0.5, rely=0.45, anchor="center")
@@ -153,6 +162,84 @@ class MainWindow:
         self._create_bank_info(main, tc)
         self._create_buttons(main, tc)
         self._create_footer(outer, tc)
+
+    def _create_github_link(self, parent, tc):
+        try:
+            image = tk.PhotoImage(file=str(self._resource_path(GITHUB_ICON_PATH)))
+            scale = max(1, round(image.width() / 32))
+            self.github_icon_image = image.subsample(scale, scale)
+            icon = tk.Label(
+                parent,
+                image=self.github_icon_image,
+                bg=tc["bg"],
+                cursor="hand2",
+            )
+        except tk.TclError:
+            icon = tk.Label(
+                parent,
+                text="GitHub",
+                font=get_font(9, "bold"),
+                bg=tc["bg"],
+                fg=tc["text"],
+                cursor="hand2",
+            )
+        icon.place(relx=1.0, x=-20, y=18, anchor="ne")
+        icon.bind("<Button-1>", lambda _event: self._open_github())
+        icon.bind("<Enter>", lambda event: self._show_github_tooltip(event, icon, tc))
+        icon.bind("<Leave>", lambda _event: self._hide_github_tooltip(icon, tc))
+
+    @staticmethod
+    def _resource_path(relative_path: Path) -> Path:
+        """返回开发环境或 PyInstaller 环境中的资源路径。"""
+        base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+        return base / relative_path
+
+    def _show_github_tooltip(self, event, widget, tc):
+        widget.configure(bg=tc["bg_secondary"])
+        self._hide_github_tooltip()
+
+        tooltip = tk.Toplevel(self.root)
+        tooltip.wm_overrideredirect(True)
+        tooltip.configure(bg=tc["card_border"])
+
+        body = tk.Frame(tooltip, bg=tc["card_bg"], padx=12, pady=8)
+        body.pack(padx=1, pady=1)
+        tk.Label(
+            body,
+            text="如果这个系统对您有帮助，请为我点个 Star",
+            font=get_font(9),
+            bg=tc["card_bg"],
+            fg=tc["text"],
+            anchor="w",
+        ).pack(anchor="w")
+        tk.Label(
+            body,
+            text=GITHUB_URL,
+            font=get_font(8),
+            bg=tc["card_bg"],
+            fg=tc["primary"],
+            anchor="w",
+        ).pack(anchor="w", pady=(3, 0))
+
+        tooltip.update_idletasks()
+        x = max(0, event.x_root - tooltip.winfo_reqwidth() + 20)
+        y = event.y_root + 22
+        tooltip.wm_geometry(f"+{x}+{y}")
+        self.github_tooltip = tooltip
+
+    def _hide_github_tooltip(self, widget=None, tc=None):
+        if widget is not None and tc is not None:
+            widget.configure(bg=tc["bg"])
+        if self.github_tooltip is not None:
+            try:
+                self.github_tooltip.destroy()
+            except tk.TclError:
+                pass
+            self.github_tooltip = None
+
+    def _open_github(self):
+        """在系统默认浏览器中打开项目仓库。"""
+        webbrowser.open_new_tab(GITHUB_URL)
 
     def _create_menu_bar(self):
         tc = get_theme_colors()

@@ -240,7 +240,7 @@ class SettingsWindow:
             })
 
         return {
-            "version": "0.0.7",
+            "version": "0.0.8",
             "app": {
                 "name": self.app_name_var.get().strip(),
                 "subtitle": self.subtitle_var.get().strip(),

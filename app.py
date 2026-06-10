@@ -30,7 +30,6 @@ import tkinter as tk
 from ui.main_window import MainWindow
 from ui.practice_mode import PracticeModeWindow
 from ui.exam_mode import ExamModeWindow
-# from ui.edit_mode import EditModeWindow  # 待实现
 
 
 class QuizApplication:
@@ -102,15 +101,10 @@ class QuizApplication:
                     # 设置错题记录回调
                     exam_window.set_wrong_questions_callback(self.main_window.add_wrong_questions)
                     self.current_window = exam_window
-            else:
-                # 用户选择不开始考试，保持在主窗口
-                pass
         except Exception as e:
             from tkinter import messagebox
             messagebox.showerror("错误", f"启动考试模式失败：{str(e)}")
-    
 
-    
     def return_to_main(self):
         """返回主界面"""
         # 保持题库状态，不需要重新加载

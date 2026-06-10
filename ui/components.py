@@ -489,7 +489,6 @@ def _center_window_now(window, width, height):
         except Exception:
             window.geometry(f"{scaled_width}x{scaled_height}")
             window.update_idletasks()
-            pass
     else:
         window.geometry(f"{scaled_width}x{scaled_height}")
         window.update_idletasks()

@@ -303,24 +303,51 @@ class PracticeModeWindow:
     def _start_initial_practice_session(self):
         """进入练习模式时直接开始，不再弹出范围选择窗口。"""
         progress = self.user_data.get_progress(self.file_path) if self.file_path else {}
-        if progress:
-            self._practice_range = "continue"
-            self.range_var.set("continue")
-            self._collected_only = progress.get("collected_only", False)
+        saved_range = progress.get("practice_range") or ("continue" if progress else "all")
+
+        if saved_range == "continue" and self._continue_from_progress(progress):
+            return
+        if saved_range == "collected":
+            self._practice_range = "collected"
+            self.range_var.set("collected")
+            self._collected_only = True
             self._selected_question_type = progress.get("selected_type", "all")
-            if self.start_practice_session(self._selected_question_type, restore_progress=True):
+            if self.start_practice_session(self._selected_question_type, restore_progress=False):
+                return
+        if saved_range == "wrong":
+            if self.review_wrong_questions(show_tip=False, restore_progress=False):
+                return
+        if saved_range == "all":
+            self._practice_range = "all"
+            self.range_var.set("all")
+            self._collected_only = False
+            self._selected_question_type = progress.get("selected_type", "all")
+            if self.start_practice_session(self._selected_question_type, restore_progress=False):
                 return
 
-            self._practice_range = "all"
-            self.range_var.set("all")
-            self._collected_only = False
-            self._selected_question_type = "all"
-        else:
-            self._practice_range = "all"
-            self.range_var.set("all")
-            self._collected_only = False
-            self._selected_question_type = "all"
+        self._practice_range = "all"
+        self.range_var.set("all")
+        self._collected_only = False
+        self._selected_question_type = "all"
         self.start_practice_session("all", restore_progress=False)
+
+    def _continue_from_progress(self, progress: Dict[str, Any]) -> bool:
+        """按保存的题型、范围和题号继续上次练习。"""
+        if not progress:
+            return False
+
+        self._practice_range = "continue"
+        self.range_var.set("continue")
+        self._collected_only = progress.get("collected_only", False)
+        self._selected_question_type = progress.get("selected_type", "all")
+
+        if self._selected_question_type == "wrong":
+            return self.review_wrong_questions(
+                show_tip=False,
+                restore_progress=True,
+                practice_range="continue",
+            )
+        return self.start_practice_session(self._selected_question_type, restore_progress=True)
 
     def change_practice_range(self, range_key: str):
         """切换练习范围。"""
@@ -337,14 +364,16 @@ class PracticeModeWindow:
                 self._practice_range = "continue"
                 self._collected_only = progress.get("collected_only", False)
                 self._selected_question_type = progress.get("selected_type", "all")
-                if not self.start_practice_session(self._selected_question_type, restore_progress=True):
+                if not self._continue_from_progress(progress):
                     raise ValueError("start_failed")
+                self._save_progress()
             elif range_key == "all":
                 self._practice_range = "all"
                 self._collected_only = False
                 question_type = "all" if self._selected_question_type == "wrong" else self._selected_question_type
                 if not self.start_practice_session(question_type, restore_progress=False):
                     raise ValueError("start_failed")
+                self._save_progress()
             elif range_key == "collected":
                 collected = (
                     len(self.question_service.question_bank.get_collected_questions())
@@ -358,8 +387,10 @@ class PracticeModeWindow:
                 question_type = "all" if self._selected_question_type == "wrong" else self._selected_question_type
                 if not self.start_practice_session(question_type, restore_progress=False):
                     raise ValueError("start_failed")
+                self._save_progress()
             elif range_key == "wrong":
-                self.review_wrong_questions(show_tip=False)
+                if not self.review_wrong_questions(show_tip=True, restore_progress=False):
+                    raise ValueError("no_wrong")
             else:
                 return
         except ValueError:
@@ -646,11 +677,12 @@ class PracticeModeWindow:
     
     def change_question_type(self, question_type: str):
         """切换题型"""
-        if self._practice_range == "wrong":
+        if self._practice_range in ("wrong", "continue"):
             self._practice_range = "all"
             self._collected_only = False
             self.range_var.set("all")
-        self.start_practice_session(question_type, restore_progress=self._practice_range == "continue")
+        if self.start_practice_session(question_type, restore_progress=False):
+            self._save_progress()
     
     def prev_question(self):
         """上一题"""
@@ -785,6 +817,7 @@ class PracticeModeWindow:
                 self.show_current_question()
                 self.update_statistics_display()
                 self.update_button_states()
+                self._save_progress()
                 self.id_entry.delete(0, tk.END)
             else:
                 show_message_dialog("提示", f"未找到ID为{question_id}的题目", "warning")
@@ -853,6 +886,7 @@ class PracticeModeWindow:
                     self.show_current_question()
                     self.update_statistics_display()
                     self.update_button_states()
+                    self._save_progress()
                     result_window.destroy()
         
         listbox.bind('<Double-1>', on_double_click)
@@ -873,28 +907,52 @@ class PracticeModeWindow:
             self.question_service.reset_practice_statistics()
             self.update_statistics_display()
     
-    def review_wrong_questions(self, show_tip: bool = True):
+    def review_wrong_questions(
+        self,
+        show_tip: bool = True,
+        restore_progress: bool = False,
+        practice_range: str = "wrong",
+    ) -> bool:
         """复习错题"""
-        if self.question_service.start_wrong_question_review():
-            self._practice_range = "wrong"
-            self.range_var.set("wrong")
+        wrong_questions = self._get_wrong_review_questions()
+        if self.question_service.start_review_session(wrong_questions, "wrong"):
+            self._practice_range = practice_range
+            self.range_var.set(practice_range)
             self._collected_only = False
             self._selected_question_type = "wrong"
+            if restore_progress:
+                self._restore_progress("wrong")
             self.show_current_question()
             self.update_statistics_display()
             self.update_button_states()
             self._save_progress()
             if show_tip:
                 show_message_dialog("提示", "已切换到错题复习模式", "info")
+            return True
         else:
             self.range_var.set(self._practice_range)
-            show_message_dialog("提示", "暂无错题可复习", "info")
+            if show_tip:
+                show_message_dialog("提示", "暂无错题可复习", "info")
+            return False
+
+    def _get_wrong_review_questions(self):
+        """合并当前会话错题和历史错题，作为错题复习范围。"""
+        questions_by_id = {}
+        for question in self.question_service.get_wrong_questions():
+            questions_by_id[question.id] = question
+        if self.file_path and self.question_service.question_bank:
+            for question_id in self.user_data.get_wrong_history(self.file_path):
+                question = self.question_service.question_bank.get_question_by_id(question_id)
+                if question:
+                    questions_by_id[question.id] = question
+        return list(questions_by_id.values())
     
     def shuffle_questions(self):
         """打乱题目顺序"""
         self.question_service.shuffle_current_questions()
         self.show_current_question()
         self.update_statistics_display()
+        self._save_progress()
         show_message_dialog("提示", "题目顺序已打乱", "info")
     
     def bind_keyboard_shortcuts(self):
@@ -908,6 +966,7 @@ class PracticeModeWindow:
     
     def return_to_main(self):
         """返回主界面"""
+        self._save_progress()
         if self.on_return_to_main:
             self.on_return_to_main()
     
@@ -1057,10 +1116,11 @@ class PracticeModeWindow:
 
     def _save_progress(self):
         """保存练习进度"""
-        if not self.file_path or self._practice_range == "wrong":
+        if not self.file_path:
             return
         stats = self.question_service.get_practice_statistics()
         self.user_data.save_progress(self.file_path, {
+            "practice_range": self._practice_range,
             "current_index": stats.get("current_index", 1) - 1,
             "selected_type": stats.get("selected_type", "all"),
             "collected_only": self._collected_only,

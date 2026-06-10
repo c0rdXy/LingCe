@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-108%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-110%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -82,7 +82,7 @@ LingCe/
 │   └── stats_chart.py      # 统计图表
 ├── data/                   # 题库与本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（108 个）
+├── tests/                  # 单元测试（110 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```
