@@ -1,0 +1,691 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""手工创建题库窗口。"""
+
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+from typing import Callable, Optional
+
+from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_font, get_theme_colors
+from core.utils import save_questions_to_file
+from services.question_bank_builder import (
+    QUESTION_TYPE_LABELS,
+    CHOICE_TYPES,
+    QuestionBankBuilder,
+    QuestionDraft,
+)
+from ui.components import center_window
+
+
+LABEL_TO_TYPE = {label: qtype for qtype, label in QUESTION_TYPE_LABELS.items()}
+
+
+def show_question_bank_builder_window(
+    parent: tk.Tk,
+    on_saved: Optional[Callable[[str], None]] = None,
+):
+    """显示手工创建题库窗口。"""
+    QuestionBankBuilderWindow(parent, on_saved)
+
+
+class QuestionBankBuilderWindow:
+    """手工创建题库编辑器。"""
+
+    def __init__(self, parent: tk.Tk, on_saved: Optional[Callable[[str], None]] = None):
+        self.parent = parent
+        self.on_saved = on_saved
+        self.tc = get_theme_colors()
+        self.builder = QuestionBankBuilder()
+        self.drafts = [self.builder.new_draft()]
+        self.current_index = 0
+        self._auto_save_job = None
+        self._suspend_list_events = False
+
+        self.window = tk.Toplevel(parent)
+        self.window.title("生成题库")
+        self.window.configure(bg=self.tc["bg"])
+        self.window.transient(parent)
+        center_window(self.window, 980, 700)
+        self.window.protocol("WM_DELETE_WINDOW", self.close_window)
+
+        self._create_vars()
+        self._create_ui()
+        self._bind_change_events()
+        self._load_current_draft()
+        self._refresh_list()
+
+    def _create_vars(self):
+        self.type_var = tk.StringVar()
+        self.answer_text_var = tk.StringVar()
+        self.answer_choice_var = tk.StringVar(value="")
+        self.answer_check_vars = [tk.BooleanVar(value=False) for _ in range(6)]
+        self.option_vars = [tk.StringVar() for _ in range(6)]
+        self.option_rows = []
+        self.option_entries = []
+        self.visible_option_count = 4
+        self.answer_focus_widgets = []
+
+    def _create_ui(self):
+        toolbar = tk.Frame(self.window, bg=self.tc["bg"])
+        toolbar.pack(fill="x", padx=12, pady=(12, 6))
+        tk.Label(
+            toolbar,
+            text="手工创建题库",
+            font=get_font(16, "bold"),
+            bg=self.tc["bg"],
+            fg=self.tc["primary"],
+        ).pack(side="left")
+        ttk.Button(toolbar, text="题目模板", command=self.apply_template).pack(side="left", padx=(16, 0))
+        ttk.Button(toolbar, text="保存题库", command=self.save_question_bank).pack(side="right")
+
+        body = tk.Frame(self.window, bg=self.tc["bg"])
+        body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        self._create_list_panel(body)
+        self._create_editor_panel(body)
+
+    def _create_list_panel(self, parent):
+        panel = tk.LabelFrame(
+            parent,
+            text="题目列表",
+            font=BOLD_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc["text"],
+            width=280,
+        )
+        panel.pack(side="left", fill="y", padx=(0, 10))
+        panel.pack_propagate(False)
+
+        actions = tk.Frame(panel, bg=self.tc["bg"])
+        actions.pack(fill="x", padx=8, pady=8)
+        for col in range(2):
+            actions.columnconfigure(col, weight=1)
+        ttk.Button(actions, text="新增", command=self.add_question, width=7).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        ttk.Button(actions, text="复制", command=self.duplicate_question, width=7).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        tk.Button(
+            actions,
+            text="删除当前题目",
+            command=self.delete_question,
+            bg=COLORS["danger"],
+            fg="white",
+            activebackground=COLORS["danger"],
+            activeforeground="white",
+            relief="flat",
+            cursor="hand2",
+        ).grid(row=1, column=0, columnspan=2, padx=2, pady=(6, 2), sticky="ew")
+
+        move_actions = tk.Frame(panel, bg=self.tc["bg"])
+        move_actions.pack(fill="x", padx=8, pady=(0, 8))
+        for col in range(2):
+            move_actions.columnconfigure(col, weight=1)
+        ttk.Button(move_actions, text="上移", command=self.move_up, width=7).grid(row=0, column=0, padx=2, sticky="ew")
+        ttk.Button(move_actions, text="下移", command=self.move_down, width=7).grid(row=0, column=1, padx=2, sticky="ew")
+
+        list_frame = tk.Frame(panel, bg=self.tc["bg"])
+        list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        scrollbar = ttk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+        self.question_list = tk.Listbox(
+            list_frame,
+            yscrollcommand=scrollbar.set,
+            font=get_font(10),
+            bg=self.tc["bg_secondary"],
+            fg=self.tc["text"],
+            selectbackground=self.tc["primary"],
+            selectforeground="#ffffff",
+            activestyle="none",
+        )
+        self.question_list.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.question_list.yview)
+        self.question_list.bind("<<ListboxSelect>>", self._on_list_select)
+
+        self.summary_label = tk.Label(
+            panel,
+            text="",
+            bg=self.tc["bg"],
+            fg=self.tc["text_secondary"],
+            font=get_font(9),
+            justify="left",
+        )
+        self.summary_label.pack(fill="x", padx=8, pady=(0, 8))
+
+    def _create_editor_panel(self, parent):
+        panel = tk.LabelFrame(
+            parent,
+            text="题目编辑",
+            font=BOLD_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc["text"],
+        )
+        panel.pack(side="left", fill="both", expand=True)
+
+        top = tk.Frame(panel, bg=self.tc["bg"])
+        top.pack(fill="x", padx=12, pady=10)
+        tk.Label(top, text="题型", font=DEFAULT_FONT, bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left")
+        type_box = ttk.Combobox(
+            top,
+            textvariable=self.type_var,
+            values=list(QUESTION_TYPE_LABELS.values()),
+            state="readonly",
+            width=14,
+        )
+        type_box.pack(side="left", padx=(8, 18))
+        type_box.bind("<<ComboboxSelected>>", self._on_type_change)
+
+        self.hint_label = tk.Label(
+            top,
+            text="",
+            font=get_font(9),
+            bg=self.tc["bg"],
+            fg=self.tc["text_secondary"],
+        )
+        self.hint_label.pack(side="left")
+
+        tk.Label(panel, text="题干", font=BOLD_FONT, bg=self.tc["bg"], fg=self.tc["text"]).pack(
+            anchor="w", padx=12
+        )
+        self.question_text = scrolledtext.ScrolledText(
+            panel,
+            height=6,
+            wrap=tk.WORD,
+            font=DEFAULT_FONT,
+            bg=self.tc["bg_secondary"],
+            fg=self.tc["text"],
+            insertbackground=self.tc["text"],
+        )
+        self.question_text.pack(fill="x", padx=12, pady=(4, 10))
+
+        self.options_frame = tk.LabelFrame(
+            panel,
+            text="选项",
+            font=BOLD_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc["text"],
+        )
+        self.options_frame.pack(fill="x", padx=12, pady=(0, 10))
+        for index, variable in enumerate(self.option_vars):
+            row = tk.Frame(self.options_frame, bg=self.tc["bg"])
+            row.pack(fill="x", padx=8, pady=3)
+            self.option_rows.append(row)
+            tk.Label(
+                row,
+                text=f"{chr(ord('A') + index)}.",
+                width=3,
+                bg=self.tc["bg"],
+                fg=self.tc["text"],
+            ).pack(side="left")
+            entry = ttk.Entry(row, textvariable=variable)
+            entry.pack(side="left", fill="x", expand=True)
+            self.option_entries.append(entry)
+
+        self.answer_row = tk.Frame(panel, bg=self.tc["bg"])
+        self.answer_row.pack(fill="x", padx=12, pady=(0, 10))
+        tk.Label(self.answer_row, text="答案", font=BOLD_FONT, bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left")
+        self.answer_control_container = tk.Frame(self.answer_row, bg=self.tc["bg"])
+        self.answer_control_container.pack(side="left", fill="x", expand=True, padx=(8, 0))
+
+        answer_actions = tk.Frame(panel, bg=self.tc["bg"])
+        answer_actions.pack(fill="x", padx=12, pady=(0, 10))
+        ttk.Button(answer_actions, text="增选项", command=self.add_option).pack(side="left")
+        ttk.Button(answer_actions, text="减选项", command=self.remove_option).pack(side="left")
+
+        tk.Label(panel, text="解析", font=BOLD_FONT, bg=self.tc["bg"], fg=self.tc["text"]).pack(
+            anchor="w", padx=12
+        )
+        self.explanation_text = scrolledtext.ScrolledText(
+            panel,
+            height=6,
+            wrap=tk.WORD,
+            font=DEFAULT_FONT,
+            bg=self.tc["bg_secondary"],
+            fg=self.tc["text"],
+            insertbackground=self.tc["text"],
+        )
+        self.explanation_text.pack(fill="both", expand=True, padx=12, pady=(4, 10))
+
+        footer = tk.Frame(panel, bg=self.tc["bg"])
+        footer.pack(fill="x", padx=12, pady=(0, 12))
+        ttk.Button(footer, text="保存当前题", command=self.save_current_question).pack(side="right")
+        ttk.Button(footer, text="保存并下一题", command=self.save_and_next_question).pack(side="right", padx=(0, 8))
+
+    def _bind_change_events(self):
+        """绑定输入变化后自动保存草稿。"""
+        self.type_var.trace_add("write", lambda *_: self._queue_auto_save())
+        self.question_text.bind("<KeyRelease>", lambda _event: self._queue_auto_save())
+        self.explanation_text.bind("<KeyRelease>", lambda _event: self._queue_auto_save())
+        for entry in self.option_entries:
+            entry.bind("<KeyRelease>", lambda _event: self._queue_auto_save())
+
+    def _on_list_select(self, _event=None):
+        if self._suspend_list_events:
+            return
+        selection = self.question_list.curselection()
+        if not selection:
+            return
+        new_index = selection[0]
+        if new_index == self.current_index:
+            return
+        self._store_current_draft(validate=False)
+        self.current_index = new_index
+        self._load_current_draft()
+
+    def _on_type_change(self, _event=None):
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        for variable in self.option_vars:
+            variable.set("")
+        self.visible_option_count = 4
+        self._reset_answer_state(qtype)
+        self._update_editor_visibility()
+        self._render_answer_controls()
+        self._queue_auto_save()
+
+    def _reset_answer_state(self, qtype: str):
+        """切换题型时同步清空不适用的答案状态。"""
+        if qtype in ("single", "judgement"):
+            self.answer_choice_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+            self.answer_text_var.set("")
+        elif qtype == "multiple":
+            self.answer_choice_var.set("")
+            self.answer_text_var.set("")
+        else:
+            self.answer_choice_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+            self.answer_text_var.set("")
+
+    def _update_editor_visibility(self):
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        if qtype in CHOICE_TYPES:
+            self.options_frame.pack_forget()
+            self.options_frame.pack(fill="x", padx=12, pady=(0, 10), before=self.answer_row)
+            self._update_option_rows()
+            self.hint_label.config(text="答案填写选项字母。单选如 A，多选如 ABC。")
+        elif qtype == "judgement":
+            self.options_frame.pack_forget()
+            self.hint_label.config(text="答案填写 A/正确 或 B/错误。")
+        else:
+            self.options_frame.pack_forget()
+            self.hint_label.config(text="答案填写标准答案或参考答案。")
+
+    def _update_option_rows(self):
+        """按当前可见数量显示选择题选项行。"""
+        for index, row in enumerate(self.option_rows):
+            if index < self.visible_option_count:
+                if not row.winfo_ismapped():
+                    row.pack(fill="x", padx=8, pady=3)
+            else:
+                row.pack_forget()
+
+    def _load_current_draft(self):
+        draft = self.drafts[self.current_index]
+        self._suspend_list_events = True
+        self.type_var.set(QUESTION_TYPE_LABELS.get(draft.type, "单选题"))
+        self.question_text.delete("1.0", tk.END)
+        self.question_text.insert("1.0", draft.question)
+        for index, variable in enumerate(self.option_vars):
+            variable.set(draft.options[index] if index < len(draft.options) else "")
+        if draft.type in CHOICE_TYPES:
+            self.visible_option_count = max(2, min(len(self.option_vars), len(draft.options) or 4))
+        else:
+            self.visible_option_count = 4
+        self.explanation_text.delete("1.0", tk.END)
+        self.explanation_text.insert("1.0", draft.explanation)
+        self._reset_answer_state(draft.type)
+        self._update_editor_visibility()
+        self._render_answer_controls()
+        self._apply_answer_to_controls(draft)
+        self.question_list.selection_clear(0, tk.END)
+        self.question_list.selection_set(self.current_index)
+        self.question_list.see(self.current_index)
+        self._suspend_list_events = False
+
+    def _store_current_draft(self, validate: bool = False, show_errors: bool = True) -> bool:
+        draft = self._collect_current_draft()
+        errors = self.builder.validate_draft(draft) if validate else []
+        if errors and show_errors:
+            messagebox.showerror("题目校验失败", "\n".join(errors), parent=self.window)
+            return False
+        self.drafts[self.current_index] = draft
+        self._refresh_list()
+        return not errors
+
+    def _collect_current_draft(self) -> QuestionDraft:
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        options = [variable.get().strip() for variable in self.option_vars[: self.visible_option_count]]
+        return QuestionDraft(
+            type=qtype,
+            question=self.question_text.get("1.0", "end-1c").strip(),
+            options=options,
+            answer=self._collect_answer_value(qtype),
+            explanation=self.explanation_text.get("1.0", "end-1c").strip(),
+        )
+
+    def _collect_answer_value(self, qtype: str) -> str:
+        """根据当前题型收集答案值。"""
+        if qtype == "judgement":
+            return self.answer_choice_var.get().strip()
+        if qtype == "single":
+            return self.answer_choice_var.get().strip()
+        if qtype == "multiple":
+            letters = [chr(ord("A") + i) for i in range(self.visible_option_count)]
+            return "".join(letter for letter, var in zip(letters, self.answer_check_vars) if var.get())
+        return self.answer_text_var.get().strip()
+
+    def _render_answer_controls(self):
+        """按题型渲染答案选择控件。"""
+        for widget in self.answer_control_container.winfo_children():
+            widget.destroy()
+        self.answer_focus_widgets = []
+
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        if qtype in ("single", "multiple"):
+            letters = [chr(ord("A") + i) for i in range(self.visible_option_count)]
+            if qtype == "single":
+                self.answer_choice_var.set(self.answer_choice_var.get() if self.answer_choice_var.get() in letters else "")
+                grid = tk.Frame(self.answer_control_container, bg=self.tc["bg"])
+                grid.pack(fill="x")
+                for i, letter in enumerate(letters):
+                    rb = tk.Radiobutton(
+                        grid,
+                        text=letter,
+                        value=letter,
+                        variable=self.answer_choice_var,
+                        indicatoron=False,
+                        width=4,
+                        command=self._queue_auto_save,
+                        bg=self.tc["bg_secondary"],
+                        fg=self.tc["text"],
+                        selectcolor=self.tc["primary"],
+                        activebackground=self.tc["card_bg"],
+                        activeforeground=self.tc["text"],
+                        relief="ridge",
+                    )
+                    rb.grid(row=0, column=i, padx=2, pady=2, sticky="ew")
+                    self.answer_focus_widgets.append(rb)
+            else:
+                grid = tk.Frame(self.answer_control_container, bg=self.tc["bg"])
+                grid.pack(fill="x")
+                for index, (letter, var) in enumerate(zip(letters, self.answer_check_vars)):
+                    cb = tk.Checkbutton(
+                        grid,
+                        text=letter,
+                        variable=var,
+                        command=self._queue_auto_save,
+                        bg=self.tc["bg_secondary"],
+                        fg=self.tc["text"],
+                        activebackground=self.tc["card_bg"],
+                        activeforeground=self.tc["text"],
+                        selectcolor=self.tc["primary"],
+                        indicatoron=False,
+                        relief="ridge",
+                        width=4,
+                    )
+                    cb.grid(row=index // 3, column=index % 3, padx=2, pady=2, sticky="ew")
+                    self.answer_focus_widgets.append(cb)
+                self.answer_choice_var.set("")
+        elif qtype == "judgement":
+            self.answer_choice_var.set(self.answer_choice_var.get() if self.answer_choice_var.get() in {"A", "B"} else "")
+            row = tk.Frame(self.answer_control_container, bg=self.tc["bg"])
+            row.pack(fill="x")
+            options = [("正确", "A"), ("错误", "B")]
+            for index, (label, value) in enumerate(options):
+                rb = tk.Radiobutton(
+                    row,
+                    text=label,
+                    value=value,
+                    variable=self.answer_choice_var,
+                    indicatoron=False,
+                    width=8,
+                    command=self._queue_auto_save,
+                    bg=self.tc["bg_secondary"],
+                    fg=self.tc["text"],
+                    selectcolor=self.tc["primary"],
+                    activebackground=self.tc["card_bg"],
+                    activeforeground=self.tc["text"],
+                    relief="ridge",
+                )
+                rb.grid(row=0, column=index, padx=2, pady=2, sticky="ew")
+                self.answer_focus_widgets.append(rb)
+        else:
+            entry = ttk.Entry(self.answer_control_container, textvariable=self.answer_text_var)
+            entry.pack(fill="x")
+            entry.bind("<KeyRelease>", lambda _event: self._queue_auto_save())
+            self.answer_focus_widgets = [entry]
+
+    def _apply_answer_to_controls(self, draft: QuestionDraft):
+        """把草稿中的答案回填到控件。"""
+        qtype = draft.type
+        if qtype == "multiple":
+            letters = set(str(draft.answer or "").upper())
+            for i, var in enumerate(self.answer_check_vars):
+                var.set(chr(ord("A") + i) in letters)
+            self.answer_choice_var.set("")
+            self.answer_text_var.set("")
+        elif qtype == "single":
+            self.answer_choice_var.set((draft.answer or "").strip().upper()[:1])
+            for var in self.answer_check_vars:
+                var.set(False)
+            self.answer_text_var.set("")
+        elif qtype == "judgement":
+            value = str(draft.answer or "").strip().upper()
+            if value in {"A", "正确", "TRUE", "T"}:
+                self.answer_choice_var.set("A")
+            elif value in {"B", "错误", "FALSE", "F"}:
+                self.answer_choice_var.set("B")
+            else:
+                self.answer_choice_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+            self.answer_text_var.set("")
+        else:
+            self.answer_text_var.set(draft.answer)
+            self.answer_choice_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+
+    def _refresh_list(self):
+        if not hasattr(self, "question_list"):
+            return
+        self._suspend_list_events = True
+        self.question_list.delete(0, tk.END)
+        for index, draft in enumerate(self.drafts, start=1):
+            self.question_list.insert(tk.END, f"{index}. {self.builder.question_summary(draft)}")
+        self._update_summary()
+        self.question_list.selection_clear(0, tk.END)
+        self.question_list.selection_set(self.current_index)
+        self.question_list.see(self.current_index)
+        self._suspend_list_events = False
+
+    def _update_summary(self):
+        counts = {key: 0 for key in QUESTION_TYPE_LABELS}
+        for draft in self.drafts:
+            counts[draft.type] = counts.get(draft.type, 0) + 1
+        lines = [f"总题数：{len(self.drafts)}"]
+        lines.extend(f"{QUESTION_TYPE_LABELS[key]}：{counts.get(key, 0)}" for key in QUESTION_TYPE_LABELS)
+        self.summary_label.config(text="\n".join(lines))
+
+    def save_current_question(self) -> bool:
+        if self._store_current_draft(validate=True, show_errors=True):
+            messagebox.showinfo("保存当前题", "当前题已保存", parent=self.window)
+            self._queue_auto_save()
+            return True
+        return False
+
+    def save_and_next_question(self) -> bool:
+        if not self._store_current_draft(validate=True, show_errors=True):
+            return False
+        if self.current_index >= len(self.drafts) - 1:
+            self.drafts.append(self.builder.new_draft())
+        self.current_index += 1
+        self._refresh_list()
+        self._load_current_draft()
+        self._queue_auto_save()
+        return True
+
+    def add_question(self):
+        self._store_current_draft(validate=False, show_errors=False)
+        self.drafts.append(self.builder.new_draft())
+        self.current_index = len(self.drafts) - 1
+        self._refresh_list()
+        self._load_current_draft()
+
+    def duplicate_question(self):
+        self._store_current_draft(validate=False, show_errors=False)
+        self.drafts.insert(self.current_index + 1, self.builder.duplicate_draft(self.drafts[self.current_index]))
+        self.current_index += 1
+        self._refresh_list()
+        self._load_current_draft()
+
+    def delete_question(self):
+        if len(self.drafts) == 1:
+            messagebox.showinfo("删除题目", "题库至少需要保留一道题", parent=self.window)
+            return
+        if not messagebox.askyesno("删除题目", "确定删除当前题吗？", parent=self.window):
+            return
+        self.drafts.pop(self.current_index)
+        self.current_index = min(self.current_index, len(self.drafts) - 1)
+        self._refresh_list()
+        self._load_current_draft()
+        self._queue_auto_save()
+
+    def move_up(self):
+        if self.current_index <= 0:
+            return
+        self._store_current_draft(validate=False, show_errors=False)
+        self.drafts[self.current_index - 1], self.drafts[self.current_index] = (
+            self.drafts[self.current_index],
+            self.drafts[self.current_index - 1],
+        )
+        self.current_index -= 1
+        self._refresh_list()
+        self._load_current_draft()
+        self._queue_auto_save()
+
+    def move_down(self):
+        if self.current_index >= len(self.drafts) - 1:
+            return
+        self._store_current_draft(validate=False, show_errors=False)
+        self.drafts[self.current_index + 1], self.drafts[self.current_index] = (
+            self.drafts[self.current_index],
+            self.drafts[self.current_index + 1],
+        )
+        self.current_index += 1
+        self._refresh_list()
+        self._load_current_draft()
+        self._queue_auto_save()
+
+    def add_option(self):
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        if qtype not in CHOICE_TYPES:
+            return
+        if self.visible_option_count >= len(self.option_vars):
+            messagebox.showinfo("提示", "选项已达上限", parent=self.window)
+            return
+        self.visible_option_count += 1
+        self._update_option_rows()
+        self._render_answer_controls()
+        self.option_entries[self.visible_option_count - 1].focus_set()
+        self._queue_auto_save()
+
+    def remove_option(self):
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        if qtype not in CHOICE_TYPES:
+            return
+        if self.visible_option_count <= 2:
+            messagebox.showinfo("提示", "选择题至少保留两个选项", parent=self.window)
+            return
+        last_index = self.visible_option_count - 1
+        self.option_vars[last_index].set("")
+        self.answer_check_vars[last_index].set(False)
+        if self.answer_choice_var.get() == chr(ord("A") + last_index):
+            self.answer_choice_var.set("")
+        self.visible_option_count -= 1
+        self._update_option_rows()
+        self._render_answer_controls()
+        self._queue_auto_save()
+
+    def apply_template(self):
+        """插入一个更像正式题库编辑器的示例模板。"""
+        templates = [
+            QuestionDraft(
+                type="single",
+                question="以下哪一项最适合作为单选题的测试答案？",
+                options=["测试选项一", "测试选项二", "测试选项三", "测试选项四"],
+                answer="B",
+                explanation="这里填写单选题解析。",
+            ),
+            QuestionDraft(
+                type="multiple",
+                question="以下哪些内容适合作为多选题测试选项？",
+                options=["支持多个正确答案", "可用于测试答案回显", "不需要填写题干", "可检查选项保存"],
+                answer="ABD",
+                explanation="这里填写多选题解析。",
+            ),
+            QuestionDraft(
+                type="judgement",
+                question="以下说法是否正确？",
+                answer="A",
+                explanation="判断题答案可填写正确/错误。",
+            ),
+        ]
+        self.drafts = templates
+        self.current_index = 0
+        self._refresh_list()
+        self._load_current_draft()
+        self._queue_auto_save()
+
+    def save_question_bank(self):
+        if not self._store_current_draft(validate=True, show_errors=True):
+            return
+        try:
+            question_bank = self.builder.build_question_bank(self.drafts)
+        except ValueError as exc:
+            messagebox.showerror("题库校验失败", str(exc), parent=self.window)
+            return
+
+        file_path = filedialog.asksaveasfilename(
+            parent=self.window,
+            title="保存题库文件",
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+            initialfile="新建题库.json",
+        )
+        if not file_path:
+            return
+
+        try:
+            question_bank.file_path = file_path
+            save_questions_to_file(question_bank, file_path)
+        except Exception as exc:
+            messagebox.showerror("保存失败", str(exc), parent=self.window)
+            return
+
+        if messagebox.askyesno("保存成功", "题库已保存，是否立即加载到首页？", parent=self.window):
+            if self.on_saved:
+                self.on_saved(file_path)
+        self.window.destroy()
+
+    def _queue_auto_save(self):
+        if self._auto_save_job is not None:
+            try:
+                self.window.after_cancel(self._auto_save_job)
+            except tk.TclError:
+                pass
+        self._auto_save_job = self.window.after(600, self._auto_save_draft)
+
+    def _auto_save_draft(self):
+        self._auto_save_job = None
+        self._store_current_draft(validate=False, show_errors=False)
+
+    def close_window(self):
+        if messagebox.askyesno("关闭窗口", "是否先保存当前草稿？", parent=self.window):
+            self._store_current_draft(validate=False, show_errors=False)
+        if self._auto_save_job is not None:
+            try:
+                self.window.after_cancel(self._auto_save_job)
+            except tk.TclError:
+                pass
+            self._auto_save_job = None
+        self.window.destroy()

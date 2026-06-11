@@ -22,6 +22,7 @@ from services.exam_db import init_db
 from ui.components import show_message_dialog, center_window
 from ui.exam_stats import show_exam_stats
 from ui.settings_window import show_settings_window
+from ui.question_bank_builder_window import show_question_bank_builder_window
 
 
 GITHUB_URL = "https://github.com/c0rdXy/LingCe"
@@ -262,6 +263,7 @@ class MainWindow:
         )
         menubar.add_cascade(label="文件", menu=file_menu)
         file_menu.add_command(label="选择题库", command=self.load_question_bank)
+        file_menu.add_command(label="生成题库", command=self.show_question_bank_builder)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
 
@@ -366,6 +368,12 @@ class MainWindow:
         )
         self.wrong_btn.pack(side="left", padx=10)
 
+        self.builder_btn = tk.Button(
+            btns, text="生成题库", font=BOLD_FONT, width=15, height=2,
+            bg=COLORS["warning"], fg="white", command=self.show_question_bank_builder,
+        )
+        self.builder_btn.pack(side="left", padx=10)
+
     def _create_footer(self, parent, tc):
         footer = tk.Frame(parent, bg=tc["header_bg"], height=40)
         footer.pack(fill="x", side="bottom")
@@ -397,6 +405,21 @@ class MainWindow:
             self.user_data.set_last_file(self.file_service.current_file_path or "")
             self.update_question_bank_info(question_bank)
             self.enable_function_buttons()
+
+    def show_question_bank_builder(self):
+        """打开手工题库创建窗口。"""
+        show_question_bank_builder_window(self.root, self._load_generated_question_bank)
+
+    def _load_generated_question_bank(self, file_path: str):
+        """加载刚生成的题库。"""
+        question_bank = self.file_service.load_question_bank(file_path, show_messages=False)
+        if not question_bank:
+            show_message_dialog("错误", "生成的题库加载失败", "error")
+            return
+        self.user_data.set_last_file(file_path)
+        self.update_question_bank_info(question_bank)
+        self.enable_function_buttons()
+        show_message_dialog("成功", "题库已生成并加载", "info")
 
     def update_question_bank_info(self, question_bank):
         file_info = self.file_service.get_file_info()

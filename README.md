@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-110%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-113%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -13,6 +13,8 @@
 ## ✨ 功能特性
 
 - 📚 **题库管理** — 导入 JSON 题库，支持创建示例题库
+- 🧩 **手工生成题库** — 在应用内逐题录入，保存为标准 JSON 题库
+- 🛠️ **题库编辑器** — 支持新增、复制、删除、上移、下移、模板与草稿自动保存
 - 🎯 **练习模式** — 逐题练习，即时反馈，按题型筛选，支持在线编辑
 - 📝 **考试模式** — 模拟考试，限时作答，自动评分，答题回顾
 - ⚙️ **系统设置** — 自定义系统名称、主题、考试时长、题型数量与分值
@@ -68,6 +70,7 @@ LingCe/
 ├── services/
 │   ├── exam_service.py     # 考试业务逻辑
 │   ├── file_service.py     # 文件导入导出
+│   ├── question_bank_builder.py # 手工题库生成
 │   ├── question_service.py # 题目管理
 │   ├── settings_service.py # 系统设置持久化
 │   └── user_data_service.py# 用户数据持久化
@@ -79,10 +82,11 @@ LingCe/
 │   ├── widgets.py          # 增强组件
 │   ├── edit_functions.py   # 编辑功能
 │   ├── settings_window.py  # 系统设置窗口
+│   ├── question_bank_builder_window.py # 题库生成窗口
 │   └── stats_chart.py      # 统计图表
 ├── data/                   # 题库与本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（110 个）
+├── tests/                  # 单元测试（113 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```

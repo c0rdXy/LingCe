@@ -12,6 +12,7 @@ from core.models import Question, QuestionBank
 from services.exam_service import ExamService
 from services.file_service import FileService
 from services.question_service import QuestionService
+from services.question_bank_builder import QuestionBankBuilder, QuestionDraft
 from services.user_data_service import UserDataService
 from services.settings_service import SettingsService
 import services.exam_db as exam_db
@@ -369,6 +370,59 @@ class TestQuestionService(unittest.TestCase):
         service = QuestionService()
 
         self.assertFalse(service.start_review_session([], "wrong"))
+
+
+class TestQuestionBankBuilder(unittest.TestCase):
+    """QuestionBankBuilder 测试"""
+
+    def test_build_question_bank_from_manual_drafts(self):
+        builder = QuestionBankBuilder()
+        drafts = [
+            QuestionDraft(
+                type="single",
+                question="单选题题干",
+                options=["选项一", "选项二"],
+                answer="A",
+                explanation="解析",
+            ),
+            QuestionDraft(
+                type="judgement",
+                question="判断题题干",
+                answer="正确",
+            ),
+            QuestionDraft(
+                type="short",
+                question="简答题题干",
+                answer="参考答案",
+            ),
+        ]
+
+        bank = builder.build_question_bank(drafts)
+
+        self.assertEqual(len(bank.questions), 3)
+        self.assertEqual(bank.questions[0].id, 1)
+        self.assertEqual(bank.questions[0].options, ["A. 选项一", "B. 选项二"])
+        self.assertEqual(bank.questions[1].type, "judgement")
+        self.assertEqual(bank.questions[1].answer, "A")
+
+    def test_rejects_invalid_choice_answer(self):
+        builder = QuestionBankBuilder()
+        draft = QuestionDraft(
+            type="single",
+            question="题干",
+            options=["选项一", "选项二"],
+            answer="C",
+        )
+
+        with self.assertRaises(ValueError):
+            builder.build_question_bank([draft])
+
+    def test_question_summary_truncates_text(self):
+        builder = QuestionBankBuilder()
+        draft = QuestionDraft(type="single", question="题干" * 20)
+        summary = builder.question_summary(draft)
+        self.assertIn("单选题", summary)
+        self.assertTrue(summary.endswith("…"))
 
 
 class TestExamModeWindowLogic(unittest.TestCase):
