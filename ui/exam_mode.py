@@ -15,6 +15,7 @@ from services.exam_service import ExamService
 from services.user_data_service import UserDataService
 from services.settings_service import SettingsService
 from services.exam_db import save_exam_record
+from ui.ai_review_window import show_ai_review_window
 from ui.components import show_message_dialog, center_window
 from ui.widgets import QuestionWidget
 
@@ -41,6 +42,7 @@ class ExamModeWindow:
         self.is_review_mode = False
         self.exam_time_limit = int(self.exam_settings.get("time_limit", 90))
         self._time_up_notified = False
+        self.ai_histories: Dict[int, list] = {}
 
         # 当前题目渲染组件
         self._question_widget: Optional[QuestionWidget] = None
@@ -341,6 +343,7 @@ class ExamModeWindow:
             review_mode=self.is_review_mode,
             user_answer=user_ans,
             correct_answer=self.current_question.answer,
+            ai_review_callback=self._open_ai_review if self._should_show_ai_review() else None,
         )
         frame = self._question_widget.render()
         frame.pack(fill="both", expand=True)
@@ -351,6 +354,15 @@ class ExamModeWindow:
 
         self._update_progress()
         self._update_answer_status()
+
+    def _should_show_ai_review(self) -> bool:
+        """回顾模式下显示 AI 复核入口。"""
+        return self.is_review_mode
+
+    def _open_ai_review(self, question: Question, user_answer: str):
+        """打开当前题 AI 复核窗口。"""
+        history = self.ai_histories.setdefault(question.id, [])
+        show_ai_review_window(self.root, question, user_answer, history)
 
     def _save_current_answer(self):
         if self.is_review_mode or not self.current_question or not self._question_widget:

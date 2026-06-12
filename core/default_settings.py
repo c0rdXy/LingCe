@@ -5,9 +5,11 @@
 from copy import deepcopy
 from typing import Any, Dict
 
+from core.ai_presets import get_default_ai_settings
+
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    "version": "0.0.10",
+    "version": "0.1.0",
     "app": {
         "name": "灵测 LingCe",
         "subtitle": "通用考试练习平台",
@@ -44,6 +46,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
             },
         ],
     },
+    "ai": get_default_ai_settings(),
 }
 
 

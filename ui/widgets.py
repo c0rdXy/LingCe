@@ -44,6 +44,7 @@ class QuestionWidget:
         review_mode: bool = False,
         user_answer: str = "",
         correct_answer: str = "",
+        ai_review_callback: Optional[Callable[[Question, str], None]] = None,
     ):
         self.parent = parent
         self.question = question
@@ -52,6 +53,7 @@ class QuestionWidget:
         self.review_mode = review_mode
         self.user_answer = user_answer
         self.correct_answer = correct_answer
+        self.ai_review_callback = ai_review_callback
 
         # 答题变量
         self.answer_var = tk.StringVar()
@@ -333,6 +335,22 @@ class QuestionWidget:
             expl_text.pack(fill="x")
             expl_text.insert("1.0", self.question.explanation)
             expl_text.config(state="disabled")
+
+        if self.ai_review_callback:
+            ai_frame = tk.Frame(analysis_frame, bg=analysis_bg)
+            ai_frame.pack(fill="x", padx=10, pady=(8, 10))
+            ttk.Button(
+                ai_frame,
+                text="AI 复核本题",
+                command=lambda: self.ai_review_callback(self.question, self.user_answer),
+            ).pack(side="left")
+            tk.Label(
+                ai_frame,
+                text="可继续追问题目、答案或解析是否可靠",
+                bg=analysis_bg,
+                fg=tc["text_secondary"],
+                font=DEFAULT_FONT,
+            ).pack(side="left", padx=(10, 0))
 
     def _render_answer_text_block(self, parent, title: str, content: str,
                                   title_fg: str, text_fg: str, bg: str):

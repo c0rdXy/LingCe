@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """手工创建题库窗口。"""
 
+import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Callable, Optional
@@ -14,6 +15,7 @@ from core.config import (
     get_font,
     get_theme_colors,
 )
+from core.models import Question
 from core.utils import format_judge_answer, normalize_judge_answer, save_questions_to_file
 from services.question_bank_builder import (
     QUESTION_TYPE_LABELS,
@@ -21,6 +23,8 @@ from services.question_bank_builder import (
     QuestionBankBuilder,
     QuestionDraft,
 )
+from services.ai_service import AIService, AIServiceError
+from ui.ai_review_window import show_ai_review_window
 from ui.components import center_window
 
 
@@ -49,6 +53,7 @@ class QuestionBankBuilderWindow:
         self._suspend_list_events = False
         self._dirty = False
         self._loading_draft = False
+        self.ai_histories = {}
 
         self.window = tk.Toplevel(parent)
         self.window.title("生成题库")
@@ -255,6 +260,10 @@ class QuestionBankBuilderWindow:
 
         footer = tk.Frame(panel, bg=self.tc["bg"])
         footer.pack(fill="x", padx=12, pady=(0, 12))
+        self.ai_review_btn = ttk.Button(footer, text="AI 复核当前题", command=self.open_ai_review_current_question)
+        self.ai_review_btn.pack(side="left")
+        self.ai_generate_btn = ttk.Button(footer, text="AI 生成答案解析", command=self.generate_answer_with_ai)
+        self.ai_generate_btn.pack(side="left", padx=(8, 0))
         ttk.Button(footer, text="保存当前题", command=self.save_current_question).pack(side="right")
         ttk.Button(footer, text="保存并下一题", command=self.save_and_next_question).pack(side="right", padx=(0, 8))
 
@@ -690,6 +699,110 @@ class QuestionBankBuilderWindow:
                 self.on_saved(file_path)
         self._dirty = False
         self.window.destroy()
+
+    def open_ai_review_current_question(self):
+        """打开当前草稿题目的 AI 复核窗口。"""
+        self._store_current_draft(validate=False, show_errors=False)
+        draft = self.drafts[self.current_index]
+        if not draft.question.strip():
+            messagebox.showwarning("AI 复核", "请先填写题干", parent=self.window)
+            return
+        question = self._draft_to_question(draft)
+        history = self.ai_histories.setdefault(self.current_index, [])
+        show_ai_review_window(self.window, question, draft.answer, history)
+
+    def generate_answer_with_ai(self):
+        """使用 AI 生成当前题目的答案和解析。"""
+        self._store_current_draft(validate=False, show_errors=False)
+        draft = self.drafts[self.current_index]
+        if not draft.question.strip():
+            messagebox.showwarning("AI 生成", "请先填写题干", parent=self.window)
+            return
+        question = self._draft_to_question(draft)
+        self._set_ai_buttons_state("disabled")
+
+        def worker():
+            try:
+                result = AIService().generate_answer_and_explanation(question)
+                self.window.after(0, lambda: self._apply_ai_generated_answer(result))
+            except AIServiceError as exc:
+                self.window.after(0, lambda: self._on_ai_generate_error(str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_ai_generated_answer(self, result):
+        """将 AI 生成结果回填到答案与解析控件。"""
+        answer = result.get("answer", "").strip()
+        explanation = result.get("explanation", "").strip()
+        qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
+        self._apply_generated_answer(qtype, answer)
+        if explanation:
+            self.explanation_text.delete("1.0", tk.END)
+            self.explanation_text.insert("1.0", explanation)
+        self._store_current_draft(validate=False, show_errors=False)
+        self._queue_auto_save()
+        self._set_ai_buttons_state("normal")
+        messagebox.showinfo("AI 生成", "答案与解析已回填，请人工确认后保存", parent=self.window)
+
+    def _apply_generated_answer(self, qtype: str, answer: str):
+        """按题型把答案回填到对应控件。"""
+        normalized = answer.strip()
+        if qtype == "judgement":
+            value = normalize_judge_answer(normalized)
+            if value == "A":
+                self.answer_choice_var.set("正确")
+            elif value == "B":
+                self.answer_choice_var.set("错误")
+            else:
+                self.answer_choice_var.set("")
+            self.answer_text_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+        elif qtype == "single":
+            letters = [chr(ord("A") + i) for i in range(self.visible_option_count)]
+            value = normalized.upper()[:1]
+            self.answer_choice_var.set(value if value in letters else "")
+            self.answer_text_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+        elif qtype == "multiple":
+            letters = [chr(ord("A") + i) for i in range(self.visible_option_count)]
+            selected = set(ch for ch in normalized.upper() if ch in letters)
+            for index, var in enumerate(self.answer_check_vars):
+                var.set(chr(ord("A") + index) in selected)
+            self.answer_choice_var.set("")
+            self.answer_text_var.set("")
+        else:
+            self.answer_text_var.set(normalized)
+            self.answer_choice_var.set("")
+            for var in self.answer_check_vars:
+                var.set(False)
+
+    def _on_ai_generate_error(self, message: str):
+        self._set_ai_buttons_state("normal")
+        messagebox.showerror("AI 生成失败", message, parent=self.window)
+
+    def _set_ai_buttons_state(self, state: str):
+        for button in (getattr(self, "ai_review_btn", None), getattr(self, "ai_generate_btn", None)):
+            if button:
+                button.config(state=state)
+
+    def _draft_to_question(self, draft: QuestionDraft) -> Question:
+        """将编辑中的草稿转换为 AI 复核使用的题目对象。"""
+        options = []
+        if draft.type in CHOICE_TYPES:
+            for index, option in enumerate(draft.options):
+                option_text = option.strip()
+                if option_text:
+                    options.append(f"{chr(ord('A') + index)}. {option_text}")
+        return Question(
+            id=self.current_index + 1,
+            type=draft.type,
+            question=draft.question,
+            options=options,
+            answer=draft.answer,
+            explanation=draft.explanation,
+        )
 
     def _queue_auto_save(self):
         if self._loading_draft:

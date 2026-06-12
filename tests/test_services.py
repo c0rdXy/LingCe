@@ -15,6 +15,8 @@ from services.question_service import QuestionService
 from services.question_bank_builder import QuestionBankBuilder, QuestionDraft
 from services.user_data_service import UserDataService
 from services.settings_service import SettingsService
+from services.ai_service import AIService, AIServiceError
+from core.ai_presets import get_providers
 import services.exam_db as exam_db
 from ui.exam_mode import ExamModeWindow
 
@@ -276,6 +278,8 @@ class TestSettingsService(unittest.TestCase):
         self.assertEqual(service.get_app_name(), "灵测 LingCe")
         rules = service.get_exam_rules()
         self.assertEqual([r["type"] for r in rules], ["single", "multiple", "short"])
+        self.assertFalse(service.get_ai_settings()["enabled"])
+        self.assertEqual(service.get_ai_settings()["access_mode"], "api")
 
     def test_save_and_reload_settings(self):
         service = SettingsService(self.settings_file)
@@ -350,6 +354,72 @@ class TestSettingsService(unittest.TestCase):
         imported.import_settings(export_file)
 
         self.assertEqual(imported.get_app_name(), "导入导出测试")
+
+    def test_ai_settings_require_connection_fields_when_enabled(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["ai"]["enabled"] = True
+        settings["ai"]["api_key"] = ""
+
+        with self.assertRaises(ValueError):
+            service.save_settings(settings)
+
+    def test_ai_provider_presets_separate_modes(self):
+        coding_names = [item["name"] for item in get_providers("coding_plan")]
+        api_names = [item["name"] for item in get_providers("api")]
+
+        self.assertIn("智谱 GLM Coding Plan（国内）", coding_names)
+        self.assertIn("DeepSeek", api_names)
+        self.assertNotIn("DeepSeek", coding_names)
+
+
+class TestAIService(unittest.TestCase):
+    """AIService 测试"""
+
+    def test_disabled_ai_rejects_call(self):
+        service = AIService()
+        with self.assertRaises(AIServiceError):
+            service._chat([], service.get_ai_settings())
+
+    def test_review_prompt_requires_independent_judgement(self):
+        service = AIService()
+        question = Question(
+            id=1,
+            type="single",
+            question="测试题",
+            options=["A. 选项一", "B. 选项二"],
+            answer="A",
+            explanation="测试解析",
+        )
+
+        prompt = service._build_review_prompt(question, "B")
+
+        self.assertIn("不要默认题库答案正确", prompt)
+        self.assertIn("题库答案：A", prompt)
+        self.assertIn("用户答案：B", prompt)
+
+    def test_parse_generated_answer_json_from_markdown_block(self):
+        content = '```json\n{"answer":"B","explanation":"解析内容"}\n```'
+
+        result = AIService._parse_answer_json(content)
+
+        self.assertEqual(result["answer"], "B")
+        self.assertEqual(result["explanation"], "解析内容")
+
+    def test_generate_answer_prompt_requests_json(self):
+        service = AIService()
+        question = Question(
+            id=1,
+            type="multiple",
+            question="多选题",
+            options=["A. 一", "B. 二", "C. 三"],
+        )
+
+        prompt = service._build_generate_answer_prompt(question)
+
+        self.assertIn("只返回 JSON", prompt)
+        self.assertIn('"answer"', prompt)
+        self.assertIn("答案返回多个选项字母", prompt)
 
 
 class TestQuestionService(unittest.TestCase):

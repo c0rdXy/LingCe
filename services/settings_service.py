@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.config import APP_VERSION
+from core.ai_presets import get_default_ai_settings
 from core.default_settings import get_default_settings, merge_with_defaults
 
 
@@ -43,6 +44,7 @@ class SettingsService:
         else:
             self._settings = get_default_settings()
         self._settings["exam"]["rules"] = self._normalize_rules(self._settings["exam"].get("rules", []))
+        self._settings["ai"] = self._normalize_ai_settings(self._settings.get("ai", {}))
 
     def reload(self):
         """重新加载设置。"""
@@ -67,6 +69,10 @@ class SettingsService:
     def get_exam_settings(self) -> Dict[str, Any]:
         """返回考试设置。"""
         return deepcopy(self._settings.get("exam", {}))
+
+    def get_ai_settings(self) -> Dict[str, Any]:
+        """返回 AI 设置。"""
+        return deepcopy(self._settings.get("ai", get_default_ai_settings()))
 
     def get_exam_rules(self) -> List[Dict[str, Any]]:
         """返回启用的考试规则。"""
@@ -115,6 +121,7 @@ class SettingsService:
             raise ValueError("\n".join(errors))
         normalized = merge_with_defaults(settings)
         normalized["exam"]["rules"] = self._normalize_rules(normalized["exam"].get("rules", []))
+        normalized["ai"] = self._normalize_ai_settings(normalized.get("ai", {}))
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.settings_file, "w", encoding="utf-8") as f:
             json.dump(normalized, f, ensure_ascii=False, indent=2)
@@ -145,6 +152,7 @@ class SettingsService:
         errors: List[str] = []
         app = data.get("app", {})
         exam = data.get("exam", {})
+        ai = data.get("ai", {})
         rules = exam.get("rules", [])
 
         if not str(app.get("name", "")).strip():
@@ -169,6 +177,23 @@ class SettingsService:
                 errors.append(f"{rule.get('name', rule_type)} 的题数不能小于 0")
             if score is None or score < 0:
                 errors.append(f"{rule.get('name', rule_type)} 的分值不能小于 0")
+
+        if ai.get("enabled", False):
+            if not str(ai.get("base_url", "")).strip():
+                errors.append("启用 AI 时 Base URL 不能为空")
+            if not str(ai.get("model", "")).strip():
+                errors.append("启用 AI 时模型名称不能为空")
+            if not str(ai.get("api_key", "")).strip():
+                errors.append("启用 AI 时 API Key / Token 不能为空")
+            timeout = _parse_int(ai.get("timeout"))
+            max_tokens = _parse_int(ai.get("max_tokens"))
+            temperature = _parse_float(ai.get("temperature"))
+            if timeout is None or timeout <= 0:
+                errors.append("AI 超时时间必须大于 0")
+            if max_tokens is None or max_tokens <= 0:
+                errors.append("AI 最大输出 Token 必须大于 0")
+            if temperature is None or temperature < 0:
+                errors.append("AI 温度不能小于 0")
         return errors
 
     @staticmethod
@@ -227,6 +252,22 @@ class SettingsService:
                 }
 
         return [normalized_by_type[rule_type] for rule_type in SUPPORTED_RULE_TYPES]
+
+    def _normalize_ai_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """规范化 AI 设置。"""
+        normalized = get_default_ai_settings()
+        normalized.update(settings or {})
+        normalized["enabled"] = bool(normalized.get("enabled"))
+        normalized["access_mode"] = str(normalized.get("access_mode") or "api")
+        normalized["provider"] = str(normalized.get("provider") or "")
+        normalized["provider_name"] = str(normalized.get("provider_name") or "")
+        normalized["base_url"] = str(normalized.get("base_url") or "").strip()
+        normalized["model"] = str(normalized.get("model") or "").strip()
+        normalized["api_key"] = str(normalized.get("api_key") or "")
+        normalized["timeout"] = max(1, _to_int(normalized.get("timeout"), 60))
+        normalized["max_tokens"] = max(1, _to_int(normalized.get("max_tokens"), 2000))
+        normalized["temperature"] = max(0.0, _to_float(normalized.get("temperature"), 0.2))
+        return normalized
 
 
 def _to_int(value: Any, default: int) -> int:

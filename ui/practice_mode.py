@@ -13,6 +13,7 @@ from core.utils import format_judge_answer
 from services.question_service import QuestionService
 from services.settings_service import SettingsService
 from ui.components import QuestionDisplay, show_message_dialog, center_window
+from ui.ai_review_window import show_ai_review_window
 from ui.widgets import get_question_type_name
 from services.user_data_service import UserDataService
 from ui.edit_functions import create_edit_interface, update_answer_format_hint, save_edit_changes, save_question_bank_to_file
@@ -48,6 +49,7 @@ class PracticeModeWindow:
         self._practice_range = "all"
         self._selected_question_type = "all"
         self.range_var = tk.StringVar(value=self._practice_range)
+        self.ai_histories: Dict[int, list] = {}
 
         self.create_practice_interface()
         self.bind_keyboard_shortcuts()
@@ -572,6 +574,7 @@ class PracticeModeWindow:
             explanation_text.pack(fill='both', expand=True, padx=10, pady=(0, 5))
             explanation_text.insert('1.0', question.explanation)
             explanation_text.config(state='disabled')
+        self._create_ai_review_entry(answer_frame, question, "")
     
     def show_answer_info_with_result(self, question: Question, result: dict, user_answer: str):
         """显示答案信息和答题结果"""
@@ -656,6 +659,30 @@ class PracticeModeWindow:
             explanation_text.pack(fill='both', expand=True, padx=10, pady=(0, 5))
             explanation_text.insert('1.0', question.explanation)
             explanation_text.config(state='disabled')
+        self._create_ai_review_entry(answer_frame, question, user_answer)
+
+    def _create_ai_review_entry(self, parent, question: Question, user_answer: str):
+        """创建 AI 复核入口。"""
+        tc = get_theme_colors()
+        row = tk.Frame(parent, bg=parent.cget("bg"))
+        row.pack(fill="x", padx=10, pady=(8, 10))
+        ttk.Button(
+            row,
+            text="AI 复核本题",
+            command=lambda: self._open_ai_review(question, user_answer),
+        ).pack(side="left")
+        tk.Label(
+            row,
+            text="可继续追问题目、答案或解析是否可靠",
+            bg=parent.cget("bg"),
+            fg=tc["text_secondary"],
+            font=DEFAULT_FONT,
+        ).pack(side="left", padx=(10, 0))
+
+    def _open_ai_review(self, question: Question, user_answer: str):
+        """打开当前题 AI 复核窗口。"""
+        history = self.ai_histories.setdefault(question.id, [])
+        show_ai_review_window(self.root, question, user_answer, history)
     
     def convert_judge_answer_display(self, question: Question, user_answer: str) -> str:
         """转换判断题答案显示"""

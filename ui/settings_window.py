@@ -4,9 +4,20 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import time
 from typing import Callable, Dict, Any
 
+from core.ai_presets import (
+    get_access_mode_names,
+    get_provider,
+    get_providers,
+    mode_key_from_name,
+    mode_name_from_key,
+    provider_id_from_name,
+    provider_name_from_id,
+)
 from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors, THEMES
+from services.ai_service import AIService, AIServiceError
 from services.settings_service import SettingsService
 from ui.components import center_window
 
@@ -34,7 +45,7 @@ class SettingsWindow:
         self.window.configure(bg=self.tc["bg"])
         self.window.transient(parent)
         self.window.grab_set()
-        center_window(self.window, 680, 560)
+        center_window(self.window, 760, 620)
 
         self._create_vars()
         self._create_ui()
@@ -54,6 +65,18 @@ class SettingsWindow:
         self.auto_submit_var = tk.BooleanVar(
             value=exam.get("auto_submit_when_time_up", False)
         )
+        ai = self.settings.get("ai", {})
+        access_mode = ai.get("access_mode", "api")
+        provider = ai.get("provider", "deepseek")
+        self.ai_enabled_var = tk.BooleanVar(value=ai.get("enabled", False))
+        self.ai_access_mode_var = tk.StringVar(value=mode_name_from_key(access_mode))
+        self.ai_provider_var = tk.StringVar(value=provider_name_from_id(access_mode, provider))
+        self.ai_model_var = tk.StringVar(value=ai.get("model", ""))
+        self.ai_base_url_var = tk.StringVar(value=ai.get("base_url", ""))
+        self.ai_key_var = tk.StringVar(value=ai.get("api_key", ""))
+        self.ai_timeout_var = tk.StringVar(value=str(ai.get("timeout", 60)))
+        self.ai_temperature_var = tk.StringVar(value=str(ai.get("temperature", 0.2)))
+        self.ai_max_tokens_var = tk.StringVar(value=str(ai.get("max_tokens", 2000)))
 
     def _create_ui(self):
         notebook = ttk.Notebook(self.window)
@@ -61,11 +84,14 @@ class SettingsWindow:
 
         app_tab = tk.Frame(notebook, bg=self.tc["bg"])
         exam_tab = tk.Frame(notebook, bg=self.tc["bg"])
+        ai_tab = tk.Frame(notebook, bg=self.tc["bg"])
         notebook.add(app_tab, text="基础设置")
         notebook.add(exam_tab, text="考试设置")
+        notebook.add(ai_tab, text="AI 设置")
 
         self._create_app_tab(app_tab)
         self._create_exam_tab(exam_tab)
+        self._create_ai_tab(ai_tab)
 
         footer = tk.Frame(self.window, bg=self.tc["bg"])
         footer.pack(fill="x", padx=15, pady=(0, 15))
@@ -131,6 +157,60 @@ class SettingsWindow:
                 "score": 0, "auto_score": item["type"] != "short",
             })
             self._add_rule_row(rules_frame, rule)
+
+    def _create_ai_tab(self, parent):
+        form = tk.Frame(parent, bg=self.tc["bg"])
+        form.pack(fill="x", padx=20, pady=20)
+        form.columnconfigure(1, weight=1)
+
+        ttk.Checkbutton(form, text="启用 AI 复核",
+                        variable=self.ai_enabled_var).grid(
+            row=0, column=1, sticky="w", pady=(0, 10)
+        )
+
+        tk.Label(form, text="接入方式", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=1, column=0, sticky="w", pady=8)
+        self.ai_access_box = ttk.Combobox(
+            form,
+            textvariable=self.ai_access_mode_var,
+            values=get_access_mode_names(),
+            state="readonly",
+            width=26,
+        )
+        self.ai_access_box.grid(row=1, column=1, sticky="w", pady=8, padx=(10, 0))
+        self.ai_access_box.bind("<<ComboboxSelected>>", self._on_ai_access_mode_changed)
+
+        tk.Label(form, text="服务商", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=2, column=0, sticky="w", pady=8)
+        self.ai_provider_box = ttk.Combobox(
+            form,
+            textvariable=self.ai_provider_var,
+            state="readonly",
+            width=34,
+        )
+        self.ai_provider_box.grid(row=2, column=1, sticky="w", pady=8, padx=(10, 0))
+        self.ai_provider_box.bind("<<ComboboxSelected>>", self._on_ai_provider_changed)
+
+        tk.Label(form, text="模型 / 通道", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=3, column=0, sticky="w", pady=8)
+        self.ai_model_box = ttk.Combobox(
+            form,
+            textvariable=self.ai_model_var,
+            width=34,
+        )
+        self.ai_model_box.grid(row=3, column=1, sticky="we", pady=8, padx=(10, 0))
+
+        self._add_labeled_entry(form, "Base URL", self.ai_base_url_var, 4)
+        self._add_labeled_entry(form, "API Key / Token", self.ai_key_var, 5)
+        self._add_labeled_entry(form, "超时时间（秒）", self.ai_timeout_var, 6)
+        self._add_labeled_entry(form, "温度", self.ai_temperature_var, 7)
+        self._add_labeled_entry(form, "最大输出 Token", self.ai_max_tokens_var, 8)
+
+        action_row = tk.Frame(form, bg=self.tc["bg"])
+        action_row.grid(row=9, column=1, sticky="w", pady=(12, 0), padx=(10, 0))
+        ttk.Button(action_row, text="测试连接", command=self._test_ai_connection).pack(side="left")
+
+        self._refresh_ai_provider_options(keep_current=True)
 
     def _add_labeled_entry(self, parent, label, variable, row):
         tk.Label(parent, text=label, font=DEFAULT_FONT,
@@ -240,7 +320,7 @@ class SettingsWindow:
             })
 
         return {
-            "version": "0.0.8",
+            "version": "0.0.10",
             "app": {
                 "name": self.app_name_var.get().strip(),
                 "subtitle": self.subtitle_var.get().strip(),
@@ -255,4 +335,67 @@ class SettingsWindow:
                 "auto_submit_when_time_up": self.auto_submit_var.get(),
                 "rules": rules,
             },
+            "ai": self._collect_ai_settings(),
         }
+
+    def _collect_ai_settings(self) -> Dict[str, Any]:
+        access_mode = mode_key_from_name(self.ai_access_mode_var.get())
+        provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
+        return {
+            "enabled": self.ai_enabled_var.get(),
+            "access_mode": access_mode,
+            "provider": provider_id,
+            "provider_name": self.ai_provider_var.get(),
+            "base_url": self.ai_base_url_var.get().strip(),
+            "model": self.ai_model_var.get().strip(),
+            "api_key": self.ai_key_var.get(),
+            "timeout": self.ai_timeout_var.get() or "60",
+            "temperature": self.ai_temperature_var.get() or "0.2",
+            "max_tokens": self.ai_max_tokens_var.get() or "2000",
+        }
+
+    def _on_ai_access_mode_changed(self, _event=None):
+        self._refresh_ai_provider_options(keep_current=False)
+
+    def _on_ai_provider_changed(self, _event=None):
+        self._apply_ai_provider_preset()
+
+    def _refresh_ai_provider_options(self, keep_current: bool):
+        access_mode = mode_key_from_name(self.ai_access_mode_var.get())
+        providers = get_providers(access_mode)
+        names = [provider["name"] for provider in providers]
+        self.ai_provider_box.configure(values=names)
+        if not keep_current or self.ai_provider_var.get() not in names:
+            self.ai_provider_var.set(names[0])
+            self._apply_ai_provider_preset()
+        else:
+            self._refresh_ai_model_options()
+
+    def _apply_ai_provider_preset(self):
+        access_mode = mode_key_from_name(self.ai_access_mode_var.get())
+        provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
+        provider = get_provider(access_mode, provider_id)
+        self.ai_base_url_var.set(provider.get("base_url", ""))
+        models = provider.get("models", [])
+        self.ai_model_box.configure(values=models)
+        if models:
+            self.ai_model_var.set(models[0])
+
+    def _refresh_ai_model_options(self):
+        access_mode = mode_key_from_name(self.ai_access_mode_var.get())
+        provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
+        provider = get_provider(access_mode, provider_id)
+        self.ai_model_box.configure(values=provider.get("models", []))
+
+    def _test_ai_connection(self):
+        settings = self._collect_ai_settings()
+        settings["enabled"] = True
+        start = time.perf_counter()
+        try:
+            AIService(self.settings_service).test_connection(settings)
+        except AIServiceError as exc:
+            elapsed = time.perf_counter() - start
+            messagebox.showerror("AI 连接失败", f"{exc}\n\n耗时：{elapsed:.2f} 秒", parent=self.window)
+            return
+        elapsed = time.perf_counter() - start
+        messagebox.showinfo("AI 连接", f"连接成功\n耗时：{elapsed:.2f} 秒", parent=self.window)

@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-114%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-120%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -17,6 +17,7 @@
 - 🛠️ **题库编辑器** — 支持新增、复制、删除、上移、下移、模板与草稿自动保存
 - 🎯 **练习模式** — 逐题练习，即时反馈，按题型筛选，支持在线编辑
 - 📝 **考试模式** — 模拟考试，限时作答，自动评分，答题回顾
+- 🤖 **AI 复核** — 支持 API / Coding Plan / 自定义模型，对题目答案与解析进行复核追问
 - ⚙️ **系统设置** — 自定义系统名称、主题、考试时长、题型数量与分值
 - ❌ **错题集** — 自动记录错题，支持导出复习
 - 📊 **学习统计** — 答题数据统计与可视化（matplotlib 可选）
@@ -64,11 +65,13 @@ LingCe/
 ├── app.py                  # 主程序入口
 ├── core/
 │   ├── config.py           # 配置与主题管理
+│   ├── ai_presets.py       # AI 接入预设
 │   ├── default_settings.py # 默认系统设置
 │   ├── models.py           # 数据模型
 │   └── utils.py            # 工具函数
 ├── services/
 │   ├── exam_service.py     # 考试业务逻辑
+│   ├── ai_service.py       # AI 复核服务
 │   ├── file_service.py     # 文件导入导出
 │   ├── question_bank_builder.py # 手工题库生成
 │   ├── question_service.py # 题目管理
@@ -80,13 +83,14 @@ LingCe/
 │   ├── exam_mode.py        # 考试模式
 │   ├── components.py       # 通用 UI 组件
 │   ├── widgets.py          # 增强组件
+│   ├── ai_review_window.py # AI 复核窗口
 │   ├── edit_functions.py   # 编辑功能
 │   ├── settings_window.py  # 系统设置窗口
 │   └── question_bank_builder_window.py # 题库生成窗口
 ├── question_banks/         # 示例题库与本地生成题库
 ├── data/                   # 本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（114 个）
+├── tests/                  # 单元测试（120 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```
