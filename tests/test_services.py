@@ -403,7 +403,7 @@ class TestQuestionBankBuilder(unittest.TestCase):
         self.assertEqual(bank.questions[0].id, 1)
         self.assertEqual(bank.questions[0].options, ["A. 选项一", "B. 选项二"])
         self.assertEqual(bank.questions[1].type, "judgement")
-        self.assertEqual(bank.questions[1].answer, "A")
+        self.assertEqual(bank.questions[1].answer, "正确")
 
     def test_rejects_invalid_choice_answer(self):
         builder = QuestionBankBuilder()

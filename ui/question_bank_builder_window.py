@@ -6,8 +6,15 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Callable, Optional
 
-from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, get_font, get_theme_colors
-from core.utils import save_questions_to_file
+from core.config import (
+    DEFAULT_FONT,
+    BOLD_FONT,
+    COLORS,
+    QUESTION_BANK_DIR,
+    get_font,
+    get_theme_colors,
+)
+from core.utils import format_judge_answer, normalize_judge_answer, save_questions_to_file
 from services.question_bank_builder import (
     QUESTION_TYPE_LABELS,
     CHOICE_TYPES,
@@ -40,6 +47,8 @@ class QuestionBankBuilderWindow:
         self.current_index = 0
         self._auto_save_job = None
         self._suspend_list_events = False
+        self._dirty = False
+        self._loading_draft = False
 
         self.window = tk.Toplevel(parent)
         self.window.title("生成题库")
@@ -53,6 +62,7 @@ class QuestionBankBuilderWindow:
         self._bind_change_events()
         self._load_current_draft()
         self._refresh_list()
+        self._dirty = False
 
     def _create_vars(self):
         self.type_var = tk.StringVar()
@@ -270,6 +280,8 @@ class QuestionBankBuilderWindow:
         self._load_current_draft()
 
     def _on_type_change(self, _event=None):
+        if self._loading_draft:
+            return
         qtype = LABEL_TO_TYPE.get(self.type_var.get(), "single")
         for variable in self.option_vars:
             variable.set("")
@@ -321,6 +333,7 @@ class QuestionBankBuilderWindow:
     def _load_current_draft(self):
         draft = self.drafts[self.current_index]
         self._suspend_list_events = True
+        self._loading_draft = True
         self.type_var.set(QUESTION_TYPE_LABELS.get(draft.type, "单选题"))
         self.question_text.delete("1.0", tk.END)
         self.question_text.insert("1.0", draft.question)
@@ -339,13 +352,18 @@ class QuestionBankBuilderWindow:
         self.question_list.selection_clear(0, tk.END)
         self.question_list.selection_set(self.current_index)
         self.question_list.see(self.current_index)
+        self._loading_draft = False
         self._suspend_list_events = False
 
     def _store_current_draft(self, validate: bool = False, show_errors: bool = True) -> bool:
         draft = self._collect_current_draft()
         errors = self.builder.validate_draft(draft) if validate else []
         if errors and show_errors:
-            messagebox.showerror("题目校验失败", "\n".join(errors), parent=self.window)
+            messagebox.showerror(
+                "题目校验失败",
+                f"第{self.current_index + 1}题：\n" + "\n".join(errors),
+                parent=self.window,
+            )
             return False
         self.drafts[self.current_index] = draft
         self._refresh_list()
@@ -365,7 +383,7 @@ class QuestionBankBuilderWindow:
     def _collect_answer_value(self, qtype: str) -> str:
         """根据当前题型收集答案值。"""
         if qtype == "judgement":
-            return self.answer_choice_var.get().strip()
+            return format_judge_answer(self.answer_choice_var.get().strip())
         if qtype == "single":
             return self.answer_choice_var.get().strip()
         if qtype == "multiple":
@@ -426,10 +444,11 @@ class QuestionBankBuilderWindow:
                     self.answer_focus_widgets.append(cb)
                 self.answer_choice_var.set("")
         elif qtype == "judgement":
-            self.answer_choice_var.set(self.answer_choice_var.get() if self.answer_choice_var.get() in {"A", "B"} else "")
+            current = format_judge_answer(self.answer_choice_var.get())
+            self.answer_choice_var.set(current if current in {"正确", "错误"} else "")
             row = tk.Frame(self.answer_control_container, bg=self.tc["bg"])
             row.pack(fill="x")
-            options = [("正确", "A"), ("错误", "B")]
+            options = [("正确", "正确"), ("错误", "错误")]
             for index, (label, value) in enumerate(options):
                 rb = tk.Radiobutton(
                     row,
@@ -469,11 +488,11 @@ class QuestionBankBuilderWindow:
                 var.set(False)
             self.answer_text_var.set("")
         elif qtype == "judgement":
-            value = str(draft.answer or "").strip().upper()
-            if value in {"A", "正确", "TRUE", "T"}:
-                self.answer_choice_var.set("A")
-            elif value in {"B", "错误", "FALSE", "F"}:
-                self.answer_choice_var.set("B")
+            value = normalize_judge_answer(draft.answer)
+            if value == "A":
+                self.answer_choice_var.set("正确")
+            elif value == "B":
+                self.answer_choice_var.set("错误")
             else:
                 self.answer_choice_var.set("")
             for var in self.answer_check_vars:
@@ -491,7 +510,8 @@ class QuestionBankBuilderWindow:
         self._suspend_list_events = True
         self.question_list.delete(0, tk.END)
         for index, draft in enumerate(self.drafts, start=1):
-            self.question_list.insert(tk.END, f"{index}. {self.builder.question_summary(draft)}")
+            status = "✓" if not self.builder.validate_draft(draft) else "未完成"
+            self.question_list.insert(tk.END, f"{index}. [{status}] {self.builder.question_summary(draft)}")
         self._update_summary()
         self.question_list.selection_clear(0, tk.END)
         self.question_list.selection_set(self.current_index)
@@ -626,7 +646,7 @@ class QuestionBankBuilderWindow:
             QuestionDraft(
                 type="judgement",
                 question="以下说法是否正确？",
-                answer="A",
+                answer="正确",
                 explanation="判断题答案可填写正确/错误。",
             ),
         ]
@@ -643,14 +663,17 @@ class QuestionBankBuilderWindow:
             question_bank = self.builder.build_question_bank(self.drafts)
         except ValueError as exc:
             messagebox.showerror("题库校验失败", str(exc), parent=self.window)
+            self._select_first_invalid_draft()
             return
 
+        QUESTION_BANK_DIR.mkdir(parents=True, exist_ok=True)
         file_path = filedialog.asksaveasfilename(
             parent=self.window,
             title="保存题库文件",
             defaultextension=".json",
             filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
             initialfile="新建题库.json",
+            initialdir=str(QUESTION_BANK_DIR),
         )
         if not file_path:
             return
@@ -665,9 +688,13 @@ class QuestionBankBuilderWindow:
         if messagebox.askyesno("保存成功", "题库已保存，是否立即加载到首页？", parent=self.window):
             if self.on_saved:
                 self.on_saved(file_path)
+        self._dirty = False
         self.window.destroy()
 
     def _queue_auto_save(self):
+        if self._loading_draft:
+            return
+        self._dirty = True
         if self._auto_save_job is not None:
             try:
                 self.window.after_cancel(self._auto_save_job)
@@ -679,9 +706,20 @@ class QuestionBankBuilderWindow:
         self._auto_save_job = None
         self._store_current_draft(validate=False, show_errors=False)
 
+    def _select_first_invalid_draft(self):
+        for index, draft in enumerate(self.drafts):
+            if self.builder.validate_draft(draft):
+                self.current_index = index
+                self._refresh_list()
+                self._load_current_draft()
+                return
+
     def close_window(self):
-        if messagebox.askyesno("关闭窗口", "是否先保存当前草稿？", parent=self.window):
-            self._store_current_draft(validate=False, show_errors=False)
+        self._store_current_draft(validate=False, show_errors=False)
+        if self._dirty:
+            should_close = messagebox.askyesno("关闭窗口", "当前题库还有未导出的修改，确定关闭吗？", parent=self.window)
+            if not should_close:
+                return
         if self._auto_save_job is not None:
             try:
                 self.window.after_cancel(self._auto_save_job)

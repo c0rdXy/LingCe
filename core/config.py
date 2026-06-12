@@ -5,6 +5,7 @@
 """
 
 import tkinter as tk
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # 跨平台字体自动检测
@@ -119,7 +120,7 @@ def get_theme_colors() -> dict:
 # 应用信息
 # ---------------------------------------------------------------------------
 APP_NAME = "灵测 LingCe"
-APP_VERSION = "V0.0.8"
+APP_VERSION = "V0.0.9"
 WINDOW_TITLE = f"{APP_NAME} {APP_VERSION}"
 
 # ---------------------------------------------------------------------------
@@ -180,7 +181,12 @@ EXAM_CONFIG = {
 FILE_CONFIG = {
     "supported_formats": [("JSON文件", "*.json"), ("所有文件", "*.*")],
     "encoding": "utf-8",
+    "question_bank_dir": "question_banks",
+    "default_question_bank": "题库.json",
 }
+
+QUESTION_BANK_DIR = Path(FILE_CONFIG["question_bank_dir"])
+DEFAULT_QUESTION_BANK_PATH = QUESTION_BANK_DIR / FILE_CONFIG["default_question_bank"]
 
 # ---------------------------------------------------------------------------
 # UI 布局设置

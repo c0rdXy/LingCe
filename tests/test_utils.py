@@ -68,6 +68,21 @@ class TestLoadSaveQuestions(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_save_judge_answer_as_chinese_text(self):
+        questions = [Question(id=1, type="judgement", question="Q", answer="B")]
+        bank = QuestionBank(questions=questions)
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+
+        try:
+            save_questions_to_file(bank, path)
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertEqual(data[0]["answer"], "错误")
+        finally:
+            os.unlink(path)
+
     def test_load_invalid_file(self):
         with self.assertRaises(Exception):
             load_questions_from_file("/nonexistent/path.json")

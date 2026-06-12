@@ -8,6 +8,7 @@ import json
 import random
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .models import Question, QuestionBank
 
@@ -42,16 +43,20 @@ def save_questions_to_file(question_bank: QuestionBank, file_path: str):
     try:
         data = []
         for question in question_bank.questions:
+            answer = question.answer
+            if question.type in ("judge", "judgement"):
+                answer = format_judge_answer(answer)
             data.append({
                 'id': question.id,
                 'type': question.type,
                 'question': question.question,
                 'options': question.options,
-                'answer': question.answer,
+                'answer': answer,
                 'explanation': question.explanation,
                 'is_collected': question.is_collected
             })
         
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     

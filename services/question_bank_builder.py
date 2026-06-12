@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from core.models import Question, QuestionBank
-from core.utils import normalize_judge_answer
+from core.utils import format_judge_answer, normalize_judge_answer
 
 
 QUESTION_TYPE_LABELS = {
@@ -170,5 +170,5 @@ class QuestionBankBuilder:
                 return letters[0] if letters else ""
             return "".join(dict.fromkeys(letters))
         if question_type == "judgement":
-            return normalize_judge_answer(value)
+            return format_judge_answer(value)
         return value

@@ -14,6 +14,7 @@ from core.config import (
     DEFAULT_WINDOW_SIZE, get_font,
     DEFAULT_FONT, BOLD_FONT, TITLE_FONT, COLORS,
     get_theme, set_theme, get_theme_colors, THEMES,
+    DEFAULT_QUESTION_BANK_PATH,
 )
 from services.file_service import FileService
 from services.user_data_service import UserDataService
@@ -69,9 +70,10 @@ class MainWindow:
             if self._load_question_bank_path(last_file):
                 return
 
-        sample_file = Path("data") / "题库.json"
-        if sample_file.exists():
-            self._load_question_bank_path(str(sample_file))
+        for sample_file in (DEFAULT_QUESTION_BANK_PATH, Path("data") / "题库.json"):
+            if sample_file.exists():
+                self._load_question_bank_path(str(sample_file))
+                return
 
     def _load_question_bank_path(self, file_path: str) -> bool:
         """加载指定题库路径，成功后刷新主界面状态。"""

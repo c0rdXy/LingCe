@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 from typing import Optional, Dict, Any, List
 from core.models import QuestionBank, Question
 from core.utils import load_questions_from_file, save_questions_to_file
-from core.config import FILE_CONFIG
+from core.config import FILE_CONFIG, QUESTION_BANK_DIR
 
 
 class FileService:
@@ -19,6 +19,11 @@ class FileService:
     def __init__(self):
         self.current_file_path: Optional[str] = None
         self.question_bank: Optional[QuestionBank] = None
+
+    @staticmethod
+    def _question_bank_dir() -> Path:
+        QUESTION_BANK_DIR.mkdir(parents=True, exist_ok=True)
+        return QUESTION_BANK_DIR
     
     def load_question_bank(self, file_path: Optional[str] = None, show_messages: bool = True) -> Optional[QuestionBank]:
         """加载题库文件"""
@@ -26,7 +31,8 @@ class FileService:
             if not file_path:
                 file_path = filedialog.askopenfilename(
                     title="选择题库文件",
-                    filetypes=FILE_CONFIG["supported_formats"]
+                    filetypes=FILE_CONFIG["supported_formats"],
+                    initialdir=str(self._question_bank_dir()),
                 )
             
             if not file_path:
@@ -51,7 +57,8 @@ class FileService:
                 file_path = filedialog.asksaveasfilename(
                     title="保存题库文件",
                     defaultextension=".json",
-                    filetypes=FILE_CONFIG["supported_formats"]
+                    filetypes=FILE_CONFIG["supported_formats"],
+                    initialdir=str(self._question_bank_dir()),
                 )
             
             if not file_path:
@@ -76,7 +83,8 @@ class FileService:
                 title="导出错题集",
                 defaultextension=".json",
                 filetypes=FILE_CONFIG["supported_formats"],
-                initialfile="错题集.json"
+                initialfile="错题集.json",
+                initialdir=str(self._question_bank_dir()),
             )
             
             if not file_path:

@@ -33,6 +33,8 @@ Desktop.ini
 2-安全打包版本/*.exe
 dist_secure/
 3-题库文件/*.zip
+question_banks/*.json
+!question_banks/题库.json
 
 # User data
 data/exam_history.db

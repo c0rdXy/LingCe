@@ -9,9 +9,9 @@
 python extract_exam_questions.py <题库文件路径> [必须包含的题目ID]
 
 示例：
-python extract_exam_questions.py data/questions.json
-python extract_exam_questions.py data/questions.json 9
-python extract_exam_questions.py data/questions.json 9,10,11
+python extract_exam_questions.py question_banks/questions.json
+python extract_exam_questions.py question_banks/questions.json 9
+python extract_exam_questions.py question_banks/questions.json 9,10,11
 """
 
 import json
@@ -222,9 +222,9 @@ def main():
         print("使用方法：")
         print("python extract_exam_questions.py <题库文件路径> [必须包含的题目ID]")
         print("\n示例：")
-        print("python extract_exam_questions.py data/questions.json")
-        print("python extract_exam_questions.py data/questions.json 9")
-        print("python extract_exam_questions.py data/questions.json 9,10,11")
+        print("python extract_exam_questions.py question_banks/questions.json")
+        print("python extract_exam_questions.py question_banks/questions.json 9")
+        print("python extract_exam_questions.py question_banks/questions.json 9,10,11")
         sys.exit(1)
     
     # 解析命令行参数

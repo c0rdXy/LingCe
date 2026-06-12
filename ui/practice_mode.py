@@ -9,6 +9,7 @@ from tkinter import ttk, messagebox, simpledialog
 from typing import Optional, Dict, Any, Callable
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES, get_theme_colors
 from core.models import QuestionBank, Question
+from core.utils import format_judge_answer
 from services.question_service import QuestionService
 from services.settings_service import SettingsService
 from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog, center_window
@@ -660,15 +661,7 @@ class PracticeModeWindow:
     def convert_judge_answer_display(self, question: Question, user_answer: str) -> str:
         """转换判断题答案显示"""
         if question.type in ['judge', 'judgement']:
-            # 标准化答案
-            answer = user_answer.strip().upper()
-            
-            # A选项或正确相关的答案
-            if answer in ['A', '√', '正确', 'TRUE', 'T', '对']:
-                return '正确'
-            # B选项或错误相关的答案
-            elif answer in ['B', '×', '错误', 'FALSE', 'F', '错']:
-                return '错误'
+            return format_judge_answer(user_answer)
         return user_answer
     
     def get_type_name(self, question_type: str) -> str:

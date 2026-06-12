@@ -9,6 +9,7 @@ from tkinter import ttk, scrolledtext, filedialog
 from pathlib import Path
 from ui.components import show_message_dialog, center_window
 from core.config import get_font
+from core.utils import format_judge_answer
 
 
 def create_edit_interface(parent_window, current_question, type_var_callback, format_label_callback):
@@ -120,12 +121,12 @@ def update_answer_format_hint(format_label, question_type):
     type_hints = {
         'single': '答案格式：单个字母，如：A',
         'multiple': '答案格式：多个字母，如：ABC',
-        'judge': '答案格式：√ 或 ×',
+        'judge': '答案格式：正确 或 错误',
         'fill': '答案格式：填空内容，如：网络安全',
         'short': '答案格式：简答内容或要点',
         '单选题': '答案格式：单个字母，如：A',
         '多选题': '答案格式：多个字母，如：ABC',
-        '判断题': '答案格式：√ 或 ×',
+        '判断题': '答案格式：正确 或 错误',
         '填空题': '答案格式：填空内容，如：网络安全',
         '简答题': '答案格式：简答内容或要点'
     }
@@ -157,7 +158,10 @@ def save_edit_changes(current_question, type_var, question_edit, options_edit, a
         options_text = options_edit.get('1.0', 'end-1c')
         current_question.options = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
         
-        current_question.answer = answer_edit.get()
+        answer = answer_edit.get()
+        if current_question.type in ("judge", "judgement"):
+            answer = format_judge_answer(answer)
+        current_question.answer = answer
         current_question.explanation = explanation_edit.get('1.0', 'end-1c')
         
         return True

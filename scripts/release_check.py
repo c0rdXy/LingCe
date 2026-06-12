@@ -15,6 +15,7 @@ RUNTIME_FILES = {
     "data/settings.json",
     "data/exam_history.db",
 }
+GENERATED_QUESTION_BANK_PATTERN = re.compile(r"^question_banks/(?!题库\.json$).+\.json$")
 EXCLUDED_TEXT_FILES = RUNTIME_FILES | {"scripts/release_check.py"}
 MOJIBAKE_MARKERS = ("鐏", "搴", "棰", "鑰", "缁", "閿", "馃", "鈥", "鈹", "\ufffd")
 TEXT_SUFFIXES = {".py", ".md", ".txt", ".toml", ".json", ".yml", ".yaml"}
@@ -114,6 +115,8 @@ def check_runtime_files_not_staged():
     for line in staged:
         status, _, name = line.partition("\t")
         if name in RUNTIME_FILES and status != "D":
+            bad.append(name)
+        if GENERATED_QUESTION_BANK_PATTERN.match(name) and status != "D":
             bad.append(name)
     if bad:
         raise CheckFailure("runtime files are staged: " + ", ".join(bad))

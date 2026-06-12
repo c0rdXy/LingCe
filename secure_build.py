@@ -68,7 +68,7 @@ hiddenimports = [
 # 数据文件收集
 datas = [
     ('assets/github-fluidicon.png', 'assets'),
-    ('data/题库.json', 'data'),
+    ('question_banks/题库.json', 'question_banks'),
 ]
 
 # 二进制文件收集

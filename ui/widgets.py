@@ -112,7 +112,9 @@ class QuestionWidget:
     def set_user_answer(self, answer: str):
         """恢复用户作答"""
         qtype = self.question.type
-        if qtype == "single" or qtype in ("judge", "judgement"):
+        if qtype in ("judge", "judgement"):
+            self.answer_var.set(format_judge_answer(answer))
+        elif qtype == "single":
             self.answer_var.set(answer)
         elif qtype == "multiple":
             for var, letter in self.multi_vars:
@@ -255,9 +257,9 @@ class QuestionWidget:
                      fg=fg_false, bg=tc["card_bg"]).pack(side="left", padx=20)
         else:
             ttk.Radiobutton(judge_frame, text="正确",
-                            variable=self.answer_var, value="A").pack(side="left", padx=20)
+                            variable=self.answer_var, value="正确").pack(side="left", padx=20)
             ttk.Radiobutton(judge_frame, text="错误",
-                            variable=self.answer_var, value="B").pack(side="left", padx=20)
+                            variable=self.answer_var, value="错误").pack(side="left", padx=20)
 
     def _render_text_input(self, parent):
         qtype = self.question.type
