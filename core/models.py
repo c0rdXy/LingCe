@@ -141,15 +141,15 @@ class QuestionBank:
         # 直接匹配
         questions = [q for q in self.questions if q.type == question_type]
         
-        # 如果没有找到，尝试兼容性匹配
+        # 按等价题型继续查找
         if not questions:
             if question_type == "judge":
-                # 判断题的兼容性匹配
+                # 判断题等价匹配
                 questions = [q for q in self.questions if q.type in ["judgement", "judge"]]
             elif question_type == "judgement":
                 questions = [q for q in self.questions if q.type in ["judge", "judgement"]]
             elif question_type == "short":
-                # 简答题的兼容性匹配
+                # 简答题等价匹配
                 questions = [q for q in self.questions if q.type in ["short", "essay", "fill"]]
             elif question_type == "fill":
                 questions = [q for q in self.questions if q.type in ["fill", "short"]]

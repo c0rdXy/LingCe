@@ -12,7 +12,7 @@ from core.models import QuestionBank, Question
 from core.utils import format_judge_answer
 from services.question_service import QuestionService
 from services.settings_service import SettingsService
-from ui.components import QuestionDisplay, StatisticsDisplay, show_message_dialog, center_window
+from ui.components import QuestionDisplay, show_message_dialog, center_window
 from ui.widgets import get_question_type_name
 from services.user_data_service import UserDataService
 from ui.edit_functions import create_edit_interface, update_answer_format_hint, save_edit_changes, save_question_bank_to_file
@@ -29,7 +29,6 @@ class PracticeModeWindow:
         
         # 界面组件
         self.question_display = None
-        self.stats_display = None
         self.current_question_frame = None
         self.answer_frame = None
         
@@ -427,7 +426,7 @@ class PracticeModeWindow:
             self.show_no_question_message()
             return
         
-        # 清除旧的题目显示
+        # 清空题目显示区域
         for widget in self.question_container.winfo_children():
             widget.destroy()
         
@@ -468,7 +467,7 @@ class PracticeModeWindow:
         if not current_question:
             return
         
-        # 清除旧的题目显示
+        # 清空题目显示区域
         for widget in self.question_container.winfo_children():
             widget.destroy()
         
@@ -751,7 +750,7 @@ class PracticeModeWindow:
         """更新统计显示"""
         stats = self.question_service.get_practice_statistics()
         
-        # 清除旧的统计信息
+        # 清空统计信息
         for widget in self.stats_container.winfo_children():
             widget.destroy()
         
@@ -1018,7 +1017,7 @@ class PracticeModeWindow:
         update_answer_format_hint(format_label, question_type)
     
     def save_edit_window(self):
-        """保存编辑窗口的修改"""
+        """保存编辑窗口内容"""
         current_question = self.question_service.get_current_question()
         if not current_question:
             return
@@ -1035,7 +1034,7 @@ class PracticeModeWindow:
             self.edit_menu_label.entryconfig(0, label="编辑题目")
             self.show_current_question()
             
-            show_message_dialog("成功", "题目修改已保存到内存中，如需永久保存请使用保存功能", "info")
+            show_message_dialog("成功", "题目已保存到当前题库，如需写入文件请使用保存功能", "info")
     
     def cancel_edit_window(self):
         """取消编辑窗口"""

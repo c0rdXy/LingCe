@@ -136,7 +136,7 @@ def update_answer_format_hint(format_label, question_type):
 
 
 def save_edit_changes(current_question, type_var, question_edit, options_edit, answer_edit, explanation_edit):
-    """保存编辑修改"""
+    """保存题目编辑内容"""
     if not current_question:
         return False
     
@@ -166,7 +166,7 @@ def save_edit_changes(current_question, type_var, question_edit, options_edit, a
         
         return True
     except Exception as e:
-        show_message_dialog("错误", f"保存修改失败：{str(e)}", "error")
+        show_message_dialog("错误", f"保存失败：{str(e)}", "error")
         return False
 
 

@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-考试模式界面模块 — 重构版
-- 业务逻辑委托给 ExamService
-- 题目渲染委托给 QuestionWidget
-"""
+"""考试模式界面模块。"""
 
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
@@ -327,7 +323,7 @@ class ExamModeWindow:
         if not self.exam_questions or self.current_question_index >= len(self.exam_questions):
             return
 
-        # 保存旧答案
+        # 保存当前答案
         if self.current_question:
             self._save_current_answer()
 

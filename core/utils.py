@@ -6,10 +6,9 @@
 
 import json
 import random
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from .models import Question, QuestionBank
 
 
@@ -83,11 +82,6 @@ def format_time(seconds: float) -> str:
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         return f"{hours}小时{minutes}分"
-
-
-def format_datetime(dt: datetime) -> str:
-    """格式化日期时间"""
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def calculate_remaining_time(start_time: datetime, time_limit_minutes: int) -> int:
@@ -197,11 +191,6 @@ def generate_exam_questions(question_bank: QuestionBank, count: int = 50) -> Lis
             selected_questions.extend(additional)
     
     return shuffle_questions(selected_questions)
-
-
-def search_questions_by_id(question_bank: QuestionBank, question_id: int) -> Optional[Question]:
-    """根据ID搜索题目"""
-    return question_bank.get_question_by_id(question_id)
 
 
 def get_statistics_summary(correct_count: int, total_count: int, wrong_questions: List[int]) -> Dict[str, Any]:

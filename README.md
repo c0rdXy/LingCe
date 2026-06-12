@@ -82,8 +82,7 @@ LingCe/
 │   ├── widgets.py          # 增强组件
 │   ├── edit_functions.py   # 编辑功能
 │   ├── settings_window.py  # 系统设置窗口
-│   ├── question_bank_builder_window.py # 题库生成窗口
-│   └── stats_chart.py      # 统计图表
+│   └── question_bank_builder_window.py # 题库生成窗口
 ├── question_banks/         # 示例题库与本地生成题库
 ├── data/                   # 本地运行数据
 ├── scripts/                # 辅助脚本

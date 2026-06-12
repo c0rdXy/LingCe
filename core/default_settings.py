@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    "version": "0.0.9",
+    "version": "0.0.10",
     "app": {
         "name": "灵测 LingCe",
         "subtitle": "通用考试练习平台",

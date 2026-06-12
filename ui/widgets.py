@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-增强版共享 UI 组件 — 练习模式和考试模式共用
-"""
+"""题目渲染组件模块。"""
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext
@@ -32,7 +30,7 @@ def get_question_type_name(question_type: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 增强版题目渲染组件
+# 题目渲染组件
 # ---------------------------------------------------------------------------
 class QuestionWidget:
     """支持普通模式 & 回顾模式的题目渲染组件"""

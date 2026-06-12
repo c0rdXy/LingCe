@@ -21,10 +21,10 @@ class SecureBuild:
         self.secure_dir = self.root_dir / "dist_secure"
         
     def clean_old_files(self):
-        """清理旧的打包文件"""
-        print("🧹 清理旧的打包文件...")
+        """清理打包输出"""
+        print("🧹 清理打包输出...")
         
-        # 清理源码目录的打包临时文件
+        # 清理打包临时文件
         for pattern in ['build', 'dist', '*.spec', '__pycache__']:
             for item in self.source_dir.rglob(pattern):
                 if item.exists():
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         """代码混淆处理"""
         print("🔒 进行代码混淆...")
         
-        # 创建混淆后的临时目录
+        # 创建打包工作目录
         temp_dir = self.source_dir / "temp_obfuscated"
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
@@ -260,7 +260,7 @@ if __name__ == "__main__":
             # 创建安全的spec文件
             spec_file = self.create_secure_spec()
             
-            # 修改spec文件使用反调试包装器
+            # 配置反调试包装入口
             with open(spec_file, 'r', encoding='utf-8') as f:
                 spec_content = f.read()
             
@@ -298,12 +298,12 @@ if __name__ == "__main__":
             print(f"❌ 打包过程出错: {e}")
         
         finally:
-            # 清理临时文件
+            # 清理打包工作目录
             self.clean_temp_files()
     
     def clean_temp_files(self):
-        """清理临时文件"""
-        print("🧹 清理临时文件...")
+        """清理打包工作目录"""
+        print("🧹 清理打包工作目录...")
         
         temp_patterns = [
             'build', 'dist', '*.spec', '__pycache__',
@@ -329,7 +329,7 @@ if __name__ == "__main__":
         print(f"🔒 安全打包目录: {self.secure_dir}")
         print()
         
-        # 清理旧文件
+        # 清理打包输出
         self.clean_old_files()
         
         # 构建安全exe

@@ -61,7 +61,7 @@ class SettingsService:
         return deepcopy(self._settings.get("app", {}))
 
     def set_runtime_default_theme(self, theme_name: str):
-        """仅在内存中设置默认主题，用于兼容旧用户主题数据。"""
+        """设置运行时默认主题。"""
         self._settings.setdefault("app", {})["default_theme"] = theme_name
 
     def get_exam_settings(self) -> Dict[str, Any]:

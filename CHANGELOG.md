@@ -1,43 +1,71 @@
 # Changelog
 
+## V0.0.10
+
+- 清理项目中不再使用的旧组件和残留工具函数。
+- 删除无引用的统计图表占位文件。
+- 统一代码注释表述，去除开发过程痕迹。
+- 完善 README 与更新日志中的文件说明。
+
 ## V0.0.9
 
-- 优化系统并解决一些已知BUG。
+- 优化系统并解决一些已知 BUG。
 - 新增 `question_banks/` 题库目录，将题库文件与 `data/` 运行数据分离。
-- 优化手工题库生成器的保存路径、未完成题提示、校验定位和关闭提醒。
-- 统一判断题答案显示与保存格式为“正确/错误”，并兼容旧题库的 A/B 表示。
+- 完善手工题库生成器的保存路径、未完成题提示、校验定位和关闭提醒。
+- 统一判断题答案显示与保存格式为“正确/错误”，并兼容 A/B 等常见答案格式。
 
 ## V0.0.8
 
-- 解决一些已知 BUG。
-- Fix practice range persistence after returning to the main screen.
-- Keep "continue last" and range selection from overwriting each other.
-- Restore wrong-question review from saved history after re-entering practice mode.
-- Add the official GitHub icon on the home screen with a Star prompt tooltip.
-- Remove obsolete no-op/commented code left from earlier iterations.
+- 解决练习范围返回首页后未正确保持的问题。
+- 优化“继续上次”和练习范围选择的状态保存逻辑。
+- 恢复重新进入练习模式后的错题复习历史。
+- 首页新增 GitHub 图标和 Star 提示。
+- 清理无效代码和说明文本。
 
 ## V0.0.7
 
-- Stop tracking local runtime data and keep `data/user_data.json` ignored.
-- Add `data/user_data.example.json` as the user data structure example.
-- Add settings import, export, and reset-to-defaults actions.
-- Auto-load the bundled sample question bank on first launch when no previous bank exists.
-- Add `scripts/release_check.py` for version, staged runtime data, large file, mojibake, compile, and test checks.
-- Update README with local data and release check notes.
+- 将本地运行数据从版本控制中排除。
+- 新增 `data/user_data.example.json`，用于说明用户数据结构。
+- 新增系统设置导入、导出和恢复默认功能。
+- 首次启动时自动加载项目自带示例题库。
+- 新增发布检查脚本，用于版本、运行数据、文件大小、乱码、编译和测试检查。
+- 完善 README 的本地数据和发布检查说明。
 
 ## V0.0.6
 
-- Add configurable system settings for app name, subtitle, theme, exam duration, pass score, question type counts, and scores.
-- Improve exam review behavior, answer display, and question status grid highlighting.
-- Add exam history clearing from the statistics panel.
-- Keep runtime settings and exam history out of version control.
+- 新增系统名称、副标题、主题、考试时长、及格分、题型数量和分值配置。
+- 优化考试回顾、答案显示和答题状态区域。
+- 统计面板新增考试历史清除功能。
+- 运行时设置和考试历史保持为本地数据。
+
+## V0.0.5
+
+- 优化考试模式答题状态区域的当前题提示。
+- 修复考试回顾模式切换和重新考试相关问题。
+- 改进简答题在考试回顾中的答案显示格式。
+- 统计面板新增历史记录清除入口。
 
 ## V0.0.4
 
-- Fix dark theme display issues across main, practice, and exam screens.
-- Refine practice mode flow and exam navigation controls.
+- 修复深色主题下文字、背景和题目区域显示问题。
+- 优化练习模式入口流程和练习范围选择。
+- 调整收藏按钮位置和考试模式导航按钮样式。
+- 发布版本信息同步到项目文件。
 
 ## V0.0.3
 
-- Improve window centering and startup display behavior.
-- Fix startup loading order and reduce window flicker.
+- 优化窗口居中和启动显示效果。
+- 调整启动加载顺序，减少窗口闪烁。
+- 完善中文注释和题型校验逻辑。
+
+## V0.0.2
+
+- 完善练习模式、考试模式和错题记录的基础流程。
+- 增加题目编辑、收藏、统计和用户数据保存能力。
+- 改进题库加载、答案校验和题型识别逻辑。
+
+## V0.0.1
+
+- 建立 LingCe 初始项目结构。
+- 提供题库加载、练习模式、考试模式和基础统计能力。
+- 定义核心数据模型、服务层和 Tkinter 主界面。
