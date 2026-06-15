@@ -3,6 +3,9 @@
 """系统设置服务。"""
 
 import json
+import base64
+import hashlib
+import getpass
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -122,9 +125,11 @@ class SettingsService:
         normalized = merge_with_defaults(settings)
         normalized["exam"]["rules"] = self._normalize_rules(normalized["exam"].get("rules", []))
         normalized["ai"] = self._normalize_ai_settings(normalized.get("ai", {}))
+        stored = deepcopy(normalized)
+        stored["ai"] = self._encrypt_ai_keys(stored.get("ai", {}))
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.settings_file, "w", encoding="utf-8") as f:
-            json.dump(normalized, f, ensure_ascii=False, indent=2)
+            json.dump(stored, f, ensure_ascii=False, indent=2)
         self._settings = normalized
 
     def reset_to_defaults(self):
@@ -135,8 +140,10 @@ class SettingsService:
         """导出当前设置到指定 JSON 文件。"""
         target = Path(file_path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        export_data = deepcopy(self._settings)
+        export_data["ai"] = self._encrypt_ai_keys(export_data.get("ai", {}))
         with open(target, "w", encoding="utf-8") as f:
-            json.dump(self._settings, f, ensure_ascii=False, indent=2)
+            json.dump(export_data, f, ensure_ascii=False, indent=2)
 
     def import_settings(self, file_path: str):
         """从 JSON 文件导入设置，导入前会执行完整校验。"""
@@ -263,11 +270,129 @@ class SettingsService:
         normalized["provider_name"] = str(normalized.get("provider_name") or "")
         normalized["base_url"] = str(normalized.get("base_url") or "").strip()
         normalized["model"] = str(normalized.get("model") or "").strip()
-        normalized["api_key"] = str(normalized.get("api_key") or "")
+        normalized["api_keys"] = self._normalize_ai_key_entries(normalized)
+        selected_key_id = str(normalized.get("selected_key_id") or "")
+        if not selected_key_id and normalized["api_keys"]:
+            selected_key_id = normalized["api_keys"][0]["id"]
+        normalized["selected_key_id"] = selected_key_id
+        normalized["api_key"] = self._get_selected_ai_key(normalized)
         normalized["timeout"] = max(1, _to_int(normalized.get("timeout"), 60))
         normalized["max_tokens"] = max(1, _to_int(normalized.get("max_tokens"), 2000))
         normalized["temperature"] = max(0.0, _to_float(normalized.get("temperature"), 0.2))
         return normalized
+
+    def _normalize_ai_key_entries(self, settings: Dict[str, Any]) -> List[Dict[str, str]]:
+        """规范化 AI Key 列表，并兼容旧版单 Key 字段。"""
+        entries = []
+        seen = set()
+        for raw in settings.get("api_keys", []) or []:
+            if not isinstance(raw, dict):
+                continue
+            key_value = self._decrypt_if_needed(str(raw.get("value") or raw.get("api_key") or ""))
+            if not key_value:
+                continue
+            key_meta = {
+                "access_mode": str(raw.get("access_mode") or settings.get("access_mode") or "api"),
+                "provider": str(raw.get("provider") or settings.get("provider") or ""),
+            }
+            key_id = str(raw.get("id") or self._make_key_id(key_value, key_meta))
+            if key_id in seen:
+                continue
+            seen.add(key_id)
+            entries.append({
+                "id": key_id,
+                "name": str(raw.get("name") or self._default_key_name(key_value)),
+                "value": key_value,
+                "access_mode": str(raw.get("access_mode") or settings.get("access_mode") or "api"),
+                "provider": str(raw.get("provider") or settings.get("provider") or ""),
+                "provider_name": str(raw.get("provider_name") or settings.get("provider_name") or ""),
+            })
+
+        single_key = self._decrypt_if_needed(str(settings.get("api_key") or ""))
+        if single_key:
+            key_id = str(settings.get("selected_key_id") or self._make_key_id(single_key, {
+                "access_mode": str(settings.get("access_mode") or "api"),
+                "provider": str(settings.get("provider") or ""),
+            }))
+            if key_id not in seen:
+                entries.append({
+                    "id": key_id,
+                    "name": self._default_key_name(single_key),
+                    "value": single_key,
+                    "access_mode": str(settings.get("access_mode") or "api"),
+                    "provider": str(settings.get("provider") or ""),
+                    "provider_name": str(settings.get("provider_name") or ""),
+                })
+        return entries
+
+    @staticmethod
+    def _get_selected_ai_key(settings: Dict[str, Any]) -> str:
+        selected = str(settings.get("selected_key_id") or "")
+        entries = settings.get("api_keys", [])
+        for item in entries:
+            if item.get("id") == selected:
+                return item.get("value", "")
+        return entries[0]["value"] if entries else ""
+
+    def _encrypt_ai_keys(self, ai_settings: Dict[str, Any]) -> Dict[str, Any]:
+        """加密 AI Key 后用于写入配置文件。"""
+        stored = deepcopy(ai_settings)
+        entries = []
+        for item in stored.get("api_keys", []) or []:
+            value = item.get("value", "")
+            entries.append({
+                "id": item.get("id", self._make_key_id(value, {
+                    "access_mode": str(item.get("access_mode") or stored.get("access_mode", "api")),
+                    "provider": str(item.get("provider") or stored.get("provider", "")),
+                })),
+                "name": item.get("name", self._default_key_name(value)),
+                "value": self._encrypt_value(value),
+                "access_mode": item.get("access_mode", stored.get("access_mode", "api")),
+                "provider": item.get("provider", stored.get("provider", "")),
+                "provider_name": item.get("provider_name", stored.get("provider_name", "")),
+            })
+        stored["api_keys"] = entries
+        stored["api_key"] = self._encrypt_value(stored.get("api_key", ""))
+        return stored
+
+    def _encrypt_value(self, value: str) -> str:
+        if not value:
+            return ""
+        raw = value.encode("utf-8")
+        mask = self._key_stream(len(raw))
+        encrypted = bytes(b ^ mask[i] for i, b in enumerate(raw))
+        return "enc:" + base64.urlsafe_b64encode(encrypted).decode("ascii")
+
+    def _decrypt_if_needed(self, value: str) -> str:
+        if not value.startswith("enc:"):
+            return value
+        try:
+            raw = base64.urlsafe_b64decode(value[4:].encode("ascii"))
+            mask = self._key_stream(len(raw))
+            return bytes(b ^ mask[i] for i, b in enumerate(raw)).decode("utf-8")
+        except Exception:
+            return ""
+
+    def _key_stream(self, length: int) -> bytes:
+        seed = f"{getpass.getuser()}|{self.settings_file.resolve()}|LingCe".encode("utf-8")
+        chunks = []
+        counter = 0
+        while sum(len(chunk) for chunk in chunks) < length:
+            chunks.append(hashlib.sha256(seed + str(counter).encode("ascii")).digest())
+            counter += 1
+        return b"".join(chunks)[:length]
+
+    @staticmethod
+    def _make_key_id(value: str, meta: Optional[Dict[str, Any]] = None) -> str:
+        meta = meta or {}
+        raw = f"{meta.get('access_mode', 'api')}|{meta.get('provider', '')}|{value}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _default_key_name(value: str) -> str:
+        if len(value) <= 8:
+            return "Key"
+        return f"{value[:4]}...{value[-4:]}"
 
 
 def _to_int(value: Any, default: int) -> int:

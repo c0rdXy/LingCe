@@ -5,6 +5,7 @@
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlencode
 from typing import Any, Dict, List, Optional
 
 from core.ai_presets import get_default_ai_settings
@@ -38,6 +39,26 @@ class AIService:
             {"role": "user", "content": "请只回复：连接成功"},
         ]
         return self._chat(messages, ai_settings, max_tokens=32)
+
+    def list_models(self, settings: Optional[Dict[str, Any]] = None) -> List[str]:
+        """获取当前接入地址可用模型列表。"""
+        ai_settings = settings or self.get_ai_settings()
+        base_url = str(ai_settings.get("base_url") or "").strip().rstrip("/")
+        api_key = str(ai_settings.get("api_key") or "").strip()
+        if not base_url:
+            raise AIServiceError("Base URL 不能为空")
+        if not api_key:
+            raise AIServiceError("API Key / Token 不能为空")
+
+        try:
+            return self._list_openai_compatible_models(base_url, api_key, int(ai_settings.get("timeout", 60)))
+        except AIServiceError as first_error:
+            if "generativelanguage.googleapis.com" in base_url:
+                try:
+                    return self._list_gemini_native_models(api_key, int(ai_settings.get("timeout", 60)))
+                except AIServiceError:
+                    pass
+            raise first_error
 
     def review_question(
         self,
@@ -120,6 +141,76 @@ class AIService:
         except (KeyError, IndexError, TypeError) as exc:
             raise AIServiceError("AI 返回格式无法识别") from exc
         return str(content).strip()
+
+    def _list_openai_compatible_models(self, base_url: str, api_key: str, timeout: int) -> List[str]:
+        """通过 OpenAI 兼容接口获取模型列表。"""
+        request = urllib.request.Request(
+            f"{base_url}/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            raise AIServiceError(f"获取模型失败：HTTP {exc.code} {detail[:300]}") from exc
+        except urllib.error.URLError as exc:
+            raise AIServiceError(f"获取模型失败：{exc.reason}") from exc
+        except (TimeoutError, ValueError, OSError) as exc:
+            raise AIServiceError(f"获取模型失败：{exc}") from exc
+        return self._parse_model_list(data)
+
+    def _list_gemini_native_models(self, api_key: str, timeout: int) -> List[str]:
+        """通过 Gemini 原生接口获取模型列表。"""
+        query = urlencode({"key": api_key})
+        request = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models?{query}",
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            raise AIServiceError(f"获取 Gemini 模型失败：HTTP {exc.code} {detail[:300]}") from exc
+        except urllib.error.URLError as exc:
+            raise AIServiceError(f"获取 Gemini 模型失败：{exc.reason}") from exc
+        except (TimeoutError, ValueError, OSError) as exc:
+            raise AIServiceError(f"获取 Gemini 模型失败：{exc}") from exc
+        return self._parse_model_list(data)
+
+    @staticmethod
+    def _parse_model_list(data: Dict[str, Any]) -> List[str]:
+        """解析不同接口返回的模型列表。"""
+        raw_models = data.get("data")
+        if raw_models is None:
+            raw_models = data.get("models")
+        if not isinstance(raw_models, list):
+            raise AIServiceError("模型列表返回格式无法识别")
+
+        models = []
+        for item in raw_models:
+            if isinstance(item, str):
+                model_id = item
+            elif isinstance(item, dict):
+                model_id = item.get("id") or item.get("name") or item.get("model")
+                methods = item.get("supportedGenerationMethods")
+                if methods and "generateContent" not in methods:
+                    continue
+            else:
+                continue
+            if not model_id:
+                continue
+            model_id = str(model_id)
+            if model_id.startswith("models/"):
+                model_id = model_id.split("/", 1)[1]
+            models.append(model_id)
+
+        unique = sorted(dict.fromkeys(models))
+        if not unique:
+            raise AIServiceError("没有获取到可用模型")
+        return unique
 
     def _build_messages(
         self,

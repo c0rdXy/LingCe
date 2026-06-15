@@ -71,6 +71,7 @@ class AIReviewWindow:
         self.chat_frame.bind("<Configure>", self._on_chat_frame_configure)
         self.chat_canvas.bind("<Configure>", self._on_chat_canvas_configure)
         self.chat_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.chat_width = 720
 
         input_frame = tk.Frame(self.window, bg=self.tc["bg"])
         input_frame.pack(fill="x", padx=15, pady=(0, 15))
@@ -95,13 +96,21 @@ class AIReviewWindow:
     def _render_message(self, role: str, content: str):
         is_user = role == "user"
         row = tk.Frame(self.chat_frame, bg=self.tc["bg_secondary"])
-        row.pack(fill="x", padx=10, pady=6)
+        row.pack(fill="x", padx=12, pady=8)
 
-        bubble_bg = self.tc["primary"] if is_user else self.tc["card_bg"]
+        bubble_bg = self.tc["primary"] if is_user else self.tc["bg"]
         bubble_fg = "#ffffff" if is_user else self.tc["text"]
         anchor_side = "right" if is_user else "left"
-        bubble = tk.Frame(row, bg=bubble_bg, bd=0, relief="flat")
-        bubble.pack(side=anchor_side, padx=(80, 0) if is_user else (0, 80), anchor="e" if is_user else "w")
+        max_width = max(360, min(720, int(getattr(self, "chat_width", 720) * (0.58 if is_user else 0.92))))
+        bubble = tk.Frame(
+            row,
+            bg=bubble_bg,
+            bd=1,
+            relief="solid",
+            highlightthickness=1,
+            highlightbackground=self.tc["card_border"] if not is_user else self.tc["primary"],
+        )
+        bubble.pack(side=anchor_side, padx=(260, 12) if is_user else (12, 24), anchor="e" if is_user else "w")
 
         title = "你" if is_user else "AI"
         tk.Label(
@@ -110,11 +119,13 @@ class AIReviewWindow:
             font=get_font(9, "bold"),
             bg=bubble_bg,
             fg=bubble_fg,
-        ).pack(anchor="e" if is_user else "w", padx=10, pady=(7, 2))
+        ).pack(anchor="e" if is_user else "w", padx=12, pady=(9, 2))
 
-        self._render_markdown(bubble, content, bubble_bg, bubble_fg, is_user)
+        self._render_markdown_text(bubble, content, bubble_bg, bubble_fg, max_width)
 
-    def _render_markdown(self, parent, content: str, bg: str, fg: str, is_user: bool):
+    def _render_markdown_text(self, parent, content: str, bg: str, fg: str, max_width: int):
+        content_frame = tk.Frame(parent, bg=bg)
+        content_frame.pack(fill="x", padx=12, pady=(4, 12))
         lines = (content or "").splitlines() or [""]
         in_code = False
         code_lines = []
@@ -122,7 +133,7 @@ class AIReviewWindow:
             line = raw_line.rstrip()
             if line.strip().startswith("```"):
                 if in_code:
-                    self._render_code_block(parent, "\n".join(code_lines), bg)
+                    self._render_code_label(content_frame, "\n".join(code_lines), max_width)
                     code_lines = []
                     in_code = False
                 else:
@@ -131,14 +142,16 @@ class AIReviewWindow:
             if in_code:
                 code_lines.append(raw_line)
                 continue
-            self._render_markdown_line(parent, line, bg, fg, is_user)
+            self._render_markdown_label(content_frame, line, bg, fg, max_width)
         if code_lines:
-            self._render_code_block(parent, "\n".join(code_lines), bg)
+            self._render_code_label(content_frame, "\n".join(code_lines), max_width)
 
-    def _render_markdown_line(self, parent, line: str, bg: str, fg: str, is_user: bool):
+    def _render_markdown_label(self, parent, line: str, bg: str, fg: str, max_width: int):
         stripped = line.strip()
         display = self._clean_markdown_inline(stripped)
         font = DEFAULT_FONT
+        text_fg = fg
+        pad_left = 0
         if not display:
             display = " "
         elif stripped.startswith("#"):
@@ -146,24 +159,28 @@ class AIReviewWindow:
             font = get_font(11, "bold")
         elif stripped.startswith(("- ", "* ")):
             display = "• " + self._clean_markdown_inline(stripped[2:].strip())
+            pad_left = 18
         elif len(stripped) > 2 and stripped[0].isdigit() and ". " in stripped[:4]:
             display = self._clean_markdown_inline(stripped)
+            pad_left = 18
         elif stripped.startswith(">"):
             display = self._clean_markdown_inline(stripped.lstrip(">").strip())
+            text_fg = self.tc["text_secondary"]
+            pad_left = 12
 
         label = tk.Label(
             parent,
             text=display,
             font=font,
             bg=bg,
-            fg=fg,
+            fg=text_fg,
             justify="left",
             anchor="w",
-            wraplength=520,
+            wraplength=max_width - 36,
         )
-        label.pack(fill="x", padx=10, pady=(0, 3), anchor="e" if is_user else "w")
+        label.pack(fill="x", padx=(pad_left, 0), pady=(1, 4), anchor="w")
 
-    def _render_code_block(self, parent, content: str, bubble_bg: str):
+    def _render_code_label(self, parent, content: str, max_width: int):
         code_bg = "#1f2937" if self.tc["bg"] != "#f0f0f0" else "#f3f4f6"
         code_fg = "#e5e7eb" if code_bg == "#1f2937" else "#111827"
         label = tk.Label(
@@ -174,9 +191,11 @@ class AIReviewWindow:
             fg=code_fg,
             justify="left",
             anchor="w",
-            wraplength=500,
+            wraplength=max_width - 44,
+            padx=8,
+            pady=6,
         )
-        label.pack(fill="x", padx=10, pady=(4, 8))
+        label.pack(fill="x", padx=0, pady=(4, 8), anchor="w")
 
     @staticmethod
     def _clean_markdown_inline(text: str) -> str:
@@ -188,6 +207,7 @@ class AIReviewWindow:
         self.chat_canvas.configure(scrollregion=self.chat_canvas.bbox("all"))
 
     def _on_chat_canvas_configure(self, event):
+        self.chat_width = event.width
         self.chat_canvas.itemconfigure(self.chat_window, width=event.width)
 
     def _on_mousewheel(self, event):
@@ -239,9 +259,10 @@ class AIReviewWindow:
         def worker():
             try:
                 answer = task(history_snapshot)
-                self.window.after(0, lambda: self._on_ai_success(answer))
+                self.window.after(0, lambda ai_answer=answer: self._on_ai_success(ai_answer))
             except AIServiceError as exc:
-                self.window.after(0, lambda: self._on_ai_error(str(exc)))
+                message = str(exc)
+                self.window.after(0, lambda error_message=message: self._on_ai_error(error_message))
 
         threading.Thread(target=worker, daemon=True).start()
 

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """系统设置窗口。"""
 
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import time
@@ -45,7 +46,7 @@ class SettingsWindow:
         self.window.configure(bg=self.tc["bg"])
         self.window.transient(parent)
         self.window.grab_set()
-        center_window(self.window, 760, 620)
+        center_window(self.window, 800, 680)
 
         self._create_vars()
         self._create_ui()
@@ -74,9 +75,20 @@ class SettingsWindow:
         self.ai_model_var = tk.StringVar(value=ai.get("model", ""))
         self.ai_base_url_var = tk.StringVar(value=ai.get("base_url", ""))
         self.ai_key_var = tk.StringVar(value=ai.get("api_key", ""))
+        self.ai_key_entries = [dict(item) for item in ai.get("api_keys", [])]
+        self.ai_selected_key_id = ai.get("selected_key_id", "")
+        self.ai_key_select_var = tk.StringVar()
+        self.ai_key_count_var = tk.StringVar(value="当前厂商已保存 Key：0 个")
+        self._ai_key_context_meta = {
+            "access_mode": access_mode,
+            "provider": provider,
+            "provider_name": provider_name_from_id(access_mode, provider),
+        }
         self.ai_timeout_var = tk.StringVar(value=str(ai.get("timeout", 60)))
         self.ai_temperature_var = tk.StringVar(value=str(ai.get("temperature", 0.2)))
         self.ai_max_tokens_var = tk.StringVar(value=str(ai.get("max_tokens", 2000)))
+        self.ai_key_visible_var = tk.BooleanVar(value=False)
+        self._syncing_ai_controls = False
 
     def _create_ui(self):
         notebook = ttk.Notebook(self.window)
@@ -162,6 +174,7 @@ class SettingsWindow:
         form = tk.Frame(parent, bg=self.tc["bg"])
         form.pack(fill="x", padx=20, pady=20)
         form.columnconfigure(1, weight=1)
+        form.columnconfigure(2, weight=0)
 
         ttk.Checkbutton(form, text="启用 AI 复核",
                         variable=self.ai_enabled_var).grid(
@@ -175,7 +188,7 @@ class SettingsWindow:
             textvariable=self.ai_access_mode_var,
             values=get_access_mode_names(),
             state="readonly",
-            width=26,
+            width=24,
         )
         self.ai_access_box.grid(row=1, column=1, sticky="w", pady=8, padx=(10, 0))
         self.ai_access_box.bind("<<ComboboxSelected>>", self._on_ai_access_mode_changed)
@@ -186,38 +199,84 @@ class SettingsWindow:
             form,
             textvariable=self.ai_provider_var,
             state="readonly",
-            width=34,
+            width=30,
         )
         self.ai_provider_box.grid(row=2, column=1, sticky="w", pady=8, padx=(10, 0))
         self.ai_provider_box.bind("<<ComboboxSelected>>", self._on_ai_provider_changed)
 
-        tk.Label(form, text="模型 / 通道", font=DEFAULT_FONT,
-                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=3, column=0, sticky="w", pady=8)
-        self.ai_model_box = ttk.Combobox(
-            form,
-            textvariable=self.ai_model_var,
-            width=34,
-        )
-        self.ai_model_box.grid(row=3, column=1, sticky="we", pady=8, padx=(10, 0))
+        self._add_labeled_entry(form, "Base URL", self.ai_base_url_var, 3, width=62, sticky="we")
+        self._add_key_entry(form, 4)
 
-        self._add_labeled_entry(form, "Base URL", self.ai_base_url_var, 4)
-        self._add_labeled_entry(form, "API Key / Token", self.ai_key_var, 5)
-        self._add_labeled_entry(form, "超时时间（秒）", self.ai_timeout_var, 6)
-        self._add_labeled_entry(form, "温度", self.ai_temperature_var, 7)
-        self._add_labeled_entry(form, "最大输出 Token", self.ai_max_tokens_var, 8)
+        tk.Label(form, text="模型", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=7, column=0, sticky="w", pady=8)
+        model_row = tk.Frame(form, bg=self.tc["bg"])
+        model_row.grid(row=7, column=1, sticky="we", pady=8, padx=(10, 0))
+        model_row.columnconfigure(0, weight=1)
+        self.ai_model_box = ttk.Combobox(
+            model_row,
+            textvariable=self.ai_model_var,
+            width=42,
+        )
+        self.ai_model_box.grid(row=0, column=0, sticky="we")
+        self.fetch_models_btn = ttk.Button(model_row, text="获取可用模型", command=self._fetch_ai_models)
+        self.fetch_models_btn.grid(row=0, column=1, padx=(8, 0))
+
+        self._add_labeled_entry(form, "超时时间（秒）", self.ai_timeout_var, 8, width=12)
+        self._add_labeled_entry(form, "温度", self.ai_temperature_var, 9, width=12)
+        self._add_labeled_entry(form, "最大输出 Token", self.ai_max_tokens_var, 10, width=12)
 
         action_row = tk.Frame(form, bg=self.tc["bg"])
-        action_row.grid(row=9, column=1, sticky="w", pady=(12, 0), padx=(10, 0))
+        action_row.grid(row=11, column=1, sticky="w", pady=(12, 0), padx=(10, 0))
         ttk.Button(action_row, text="测试连接", command=self._test_ai_connection).pack(side="left")
 
+        self.ai_access_mode_var.trace_add("write", lambda *_: self._on_ai_access_mode_changed())
+        self.ai_provider_var.trace_add("write", lambda *_: self._on_ai_provider_changed())
         self._refresh_ai_provider_options(keep_current=True)
+        self._refresh_key_selector()
 
-    def _add_labeled_entry(self, parent, label, variable, row):
+    def _add_labeled_entry(self, parent, label, variable, row, width=30, sticky="w"):
         tk.Label(parent, text=label, font=DEFAULT_FONT,
                  bg=self.tc["bg"], fg=self.tc["text"]).grid(row=row, column=0, sticky="w", pady=8)
-        ttk.Entry(parent, textvariable=variable, width=30).grid(
-            row=row, column=1, sticky="w", pady=8, padx=(10, 0)
+        ttk.Entry(parent, textvariable=variable, width=width).grid(
+            row=row, column=1, sticky=sticky, pady=8, padx=(10, 0)
         )
+
+    def _add_key_entry(self, parent, row):
+        tk.Label(parent, text="API Key / Token", font=DEFAULT_FONT,
+                 bg=self.tc["bg"], fg=self.tc["text"]).grid(row=row, column=0, sticky="w", pady=8)
+        key_row = tk.Frame(parent, bg=self.tc["bg"])
+        key_row.grid(row=row, column=1, sticky="we", pady=8, padx=(10, 0))
+        key_row.columnconfigure(0, weight=1)
+        self.ai_key_entry = ttk.Entry(key_row, textvariable=self.ai_key_var, width=62, show="*")
+        self.ai_key_entry.grid(row=0, column=0, sticky="we")
+        self.ai_key_toggle_btn = ttk.Button(key_row, text="显示", width=6, command=self._toggle_ai_key_visibility)
+        self.ai_key_toggle_btn.grid(row=0, column=1, padx=(8, 0))
+        tk.Label(
+            parent,
+            textvariable=self.ai_key_count_var,
+            font=DEFAULT_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc.get("text_secondary", self.tc["text"]),
+        ).grid(row=row + 1, column=1, sticky="w", pady=(0, 4), padx=(10, 0))
+        key_manage_row = tk.Frame(parent, bg=self.tc["bg"])
+        key_manage_row.grid(row=row + 2, column=1, sticky="we", pady=(0, 6), padx=(10, 0))
+        key_manage_row.columnconfigure(0, weight=1)
+        self.ai_key_select_box = ttk.Combobox(
+            key_manage_row,
+            textvariable=self.ai_key_select_var,
+            state="readonly",
+            width=42,
+        )
+        self.ai_key_select_box.grid(row=0, column=0, sticky="we")
+        self.ai_key_select_box.bind("<<ComboboxSelected>>", self._on_saved_key_selected)
+        ttk.Button(key_manage_row, text="保存当前 Key", command=self._save_current_ai_key).grid(row=0, column=1, padx=(8, 0))
+        ttk.Button(key_manage_row, text="删除", command=self._delete_current_ai_key).grid(row=0, column=2, padx=(8, 0))
+
+    def _toggle_ai_key_visibility(self):
+        visible = not self.ai_key_visible_var.get()
+        self.ai_key_visible_var.set(visible)
+        self.ai_key_entry.config(show="" if visible else "*")
+        self.ai_key_toggle_btn.config(text="隐藏" if visible else "显示")
 
     def _add_rule_row(self, parent, rule):
         row = tk.Frame(parent, bg=self.tc["bg"])
@@ -320,7 +379,7 @@ class SettingsWindow:
             })
 
         return {
-            "version": "0.0.10",
+            "version": "0.1.2",
             "app": {
                 "name": self.app_name_var.get().strip(),
                 "subtitle": self.subtitle_var.get().strip(),
@@ -341,6 +400,8 @@ class SettingsWindow:
     def _collect_ai_settings(self) -> Dict[str, Any]:
         access_mode = mode_key_from_name(self.ai_access_mode_var.get())
         provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
+        self._sync_current_key_entry()
+        current_key = self._find_key_entry(self.ai_selected_key_id)
         return {
             "enabled": self.ai_enabled_var.get(),
             "access_mode": access_mode,
@@ -348,16 +409,24 @@ class SettingsWindow:
             "provider_name": self.ai_provider_var.get(),
             "base_url": self.ai_base_url_var.get().strip(),
             "model": self.ai_model_var.get().strip(),
-            "api_key": self.ai_key_var.get(),
+            "api_key": current_key.get("value", "") if current_key else self.ai_key_var.get(),
+            "api_keys": self.ai_key_entries,
+            "selected_key_id": self.ai_selected_key_id,
             "timeout": self.ai_timeout_var.get() or "60",
             "temperature": self.ai_temperature_var.get() or "0.2",
             "max_tokens": self.ai_max_tokens_var.get() or "2000",
         }
 
     def _on_ai_access_mode_changed(self, _event=None):
+        if self._syncing_ai_controls:
+            return
+        self._sync_current_key_entry(self._ai_key_context_meta)
         self._refresh_ai_provider_options(keep_current=False)
 
     def _on_ai_provider_changed(self, _event=None):
+        if self._syncing_ai_controls:
+            return
+        self._sync_current_key_entry(self._ai_key_context_meta)
         self._apply_ai_provider_preset()
 
     def _refresh_ai_provider_options(self, keep_current: bool):
@@ -366,26 +435,198 @@ class SettingsWindow:
         names = [provider["name"] for provider in providers]
         self.ai_provider_box.configure(values=names)
         if not keep_current or self.ai_provider_var.get() not in names:
+            self._syncing_ai_controls = True
             self.ai_provider_var.set(names[0])
+            self._syncing_ai_controls = False
             self._apply_ai_provider_preset()
         else:
-            self._refresh_ai_model_options()
+            self._apply_ai_provider_preset(keep_model=True)
 
-    def _apply_ai_provider_preset(self):
+    def _apply_ai_provider_preset(self, keep_model: bool = False):
         access_mode = mode_key_from_name(self.ai_access_mode_var.get())
         provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
         provider = get_provider(access_mode, provider_id)
+        self._syncing_ai_controls = True
         self.ai_base_url_var.set(provider.get("base_url", ""))
         models = provider.get("models", [])
         self.ai_model_box.configure(values=models)
-        if models:
+        if keep_model and self.ai_model_var.get() in models:
+            pass
+        elif models:
             self.ai_model_var.set(models[0])
+        else:
+            self.ai_model_var.set("")
+        self._syncing_ai_controls = False
+        self._refresh_key_selector()
+        self._ai_key_context_meta = self._current_provider_key_meta()
+
+    def _refresh_key_selector(self):
+        entries = self._current_provider_key_entries()
+        names = [item.get("name", "Key") for item in entries]
+        self.ai_key_select_box.configure(values=names)
+        self.ai_key_count_var.set(f"当前厂商已保存 Key：{len(entries)} 个")
+        selected = self._find_key_entry(self.ai_selected_key_id)
+        if selected and not self._is_current_provider_key(selected):
+            selected = None
+        if selected:
+            self.ai_key_select_var.set(selected.get("name", "Key"))
+            self.ai_key_var.set(selected.get("value", ""))
+        elif entries:
+            self.ai_selected_key_id = entries[0]["id"]
+            self.ai_key_select_var.set(entries[0].get("name", "Key"))
+            self.ai_key_var.set(entries[0].get("value", ""))
+        else:
+            self.ai_selected_key_id = ""
+            self.ai_key_select_var.set("")
+            self.ai_key_var.set("")
+
+    def _on_saved_key_selected(self, _event=None):
+        name = self.ai_key_select_var.get()
+        for item in self._current_provider_key_entries():
+            if item.get("name") == name:
+                self.ai_selected_key_id = item.get("id", "")
+                self.ai_key_var.set(item.get("value", ""))
+                return
+
+    def _save_current_ai_key(self):
+        value = self.ai_key_var.get().strip()
+        if not value:
+            messagebox.showwarning("保存 Key", "请先输入 API Key / Token", parent=self.window)
+            return
+        key_id = self._make_key_id(value)
+        name = self._default_key_name(value)
+        existing = self._find_key_entry(key_id)
+        if existing:
+            existing["value"] = value
+            existing["name"] = existing.get("name") or name
+            existing.update(self._current_provider_key_meta())
+        else:
+            self.ai_key_entries.append({
+                "id": key_id,
+                "name": name,
+                "value": value,
+                **self._current_provider_key_meta(),
+            })
+        self.ai_selected_key_id = key_id
+        self._refresh_key_selector()
+        messagebox.showinfo("保存 Key", "当前 Key 已加入列表，点击保存后写入配置", parent=self.window)
+
+    def _delete_current_ai_key(self):
+        if not self.ai_selected_key_id:
+            return
+        self.ai_key_entries = [item for item in self.ai_key_entries if item.get("id") != self.ai_selected_key_id]
+        current_entries = self._current_provider_key_entries()
+        self.ai_selected_key_id = current_entries[0]["id"] if current_entries else ""
+        self.ai_key_var.set("")
+        self._refresh_key_selector()
+
+    def _sync_current_key_entry(self, meta: Dict[str, str] = None):
+        value = self.ai_key_var.get().strip()
+        if not value:
+            return
+        meta = meta or self._current_provider_key_meta()
+        key_id = self.ai_selected_key_id or self._make_key_id(value, meta)
+        entry = self._find_key_entry(key_id)
+        if entry:
+            entry["value"] = value
+            entry.update(meta)
+        else:
+            self.ai_key_entries.append({
+                "id": key_id,
+                "name": self._default_key_name(value),
+                "value": value,
+                **meta,
+            })
+        self.ai_selected_key_id = key_id
+
+    def _select_first_saved_key(self):
+        entries = self._current_provider_key_entries()
+        if entries:
+            self.ai_selected_key_id = entries[0]["id"]
+            self.ai_key_var.set(entries[0].get("value", ""))
+            self.ai_key_select_var.set(entries[0].get("name", "Key"))
+        else:
+            self.ai_selected_key_id = ""
+            self.ai_key_var.set("")
+            self.ai_key_select_var.set("")
+
+    def _find_key_entry(self, key_id: str):
+        for item in self.ai_key_entries:
+            if item.get("id") == key_id:
+                return item
+        return None
+
+    def _current_provider_key_meta(self) -> Dict[str, str]:
+        access_mode = mode_key_from_name(self.ai_access_mode_var.get())
+        provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
+        return {
+            "access_mode": access_mode,
+            "provider": provider_id,
+            "provider_name": self.ai_provider_var.get(),
+        }
+
+    def _is_current_provider_key(self, item: Dict[str, str]) -> bool:
+        meta = self._current_provider_key_meta()
+        return (
+            item.get("access_mode") == meta["access_mode"]
+            and item.get("provider") == meta["provider"]
+        )
+
+    def _current_provider_key_entries(self):
+        meta = self._current_provider_key_meta()
+        for item in self.ai_key_entries:
+            item.setdefault("access_mode", meta["access_mode"])
+            item.setdefault("provider", meta["provider"])
+            item.setdefault("provider_name", meta["provider_name"])
+        return [item for item in self.ai_key_entries if self._is_current_provider_key(item)]
+
+    def _make_key_id(self, value: str, meta: Dict[str, str] = None) -> str:
+        import hashlib
+        meta = meta or self._current_provider_key_meta()
+        raw = f"{meta['access_mode']}|{meta['provider']}|{value}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _default_key_name(value: str) -> str:
+        return f"{value[:4]}...{value[-4:]}" if len(value) > 8 else "Key"
 
     def _refresh_ai_model_options(self):
         access_mode = mode_key_from_name(self.ai_access_mode_var.get())
         provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
         provider = get_provider(access_mode, provider_id)
         self.ai_model_box.configure(values=provider.get("models", []))
+
+    def _fetch_ai_models(self):
+        settings = self._collect_ai_settings()
+        settings["enabled"] = True
+        self._models_before_fetch = list(self.ai_model_box.cget("values"))
+        self._model_before_fetch = self.ai_model_var.get()
+        self.fetch_models_btn.config(state="disabled")
+        self.ai_model_box.configure(values=["正在获取..."])
+        self.ai_model_var.set("正在获取...")
+
+        def worker():
+            try:
+                models = AIService(self.settings_service).list_models(settings)
+                self.window.after(0, lambda loaded_models=models: self._on_ai_models_loaded(loaded_models))
+            except AIServiceError as exc:
+                message = str(exc)
+                self.window.after(0, lambda error_message=message: self._on_ai_models_error(error_message))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_ai_models_loaded(self, models):
+        self.ai_model_box.configure(values=models)
+        if models:
+            self.ai_model_var.set(models[0])
+        self.fetch_models_btn.config(state="normal")
+        messagebox.showinfo("获取可用模型", f"已获取 {len(models)} 个模型", parent=self.window)
+
+    def _on_ai_models_error(self, message: str):
+        self.fetch_models_btn.config(state="normal")
+        self.ai_model_box.configure(values=getattr(self, "_models_before_fetch", []))
+        self.ai_model_var.set(getattr(self, "_model_before_fetch", ""))
+        messagebox.showerror("获取可用模型失败", message, parent=self.window)
 
     def _test_ai_connection(self):
         settings = self._collect_ai_settings()

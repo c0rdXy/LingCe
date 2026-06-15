@@ -372,6 +372,80 @@ class TestSettingsService(unittest.TestCase):
         self.assertIn("DeepSeek", api_names)
         self.assertNotIn("DeepSeek", coding_names)
 
+    def test_ai_keys_are_encrypted_on_disk_and_decrypted_on_load(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["ai"]["api_key"] = "sk-test-secret"
+        settings["ai"]["api_keys"] = [
+            {"id": "main", "name": "主 Key", "value": "sk-test-secret"}
+        ]
+        settings["ai"]["selected_key_id"] = "main"
+        service.save_settings(settings)
+
+        raw_text = Path(self.settings_file).read_text(encoding="utf-8")
+        self.assertNotIn("sk-test-secret", raw_text)
+        raw = json.loads(raw_text)
+        self.assertTrue(raw["ai"]["api_key"].startswith("enc:"))
+        self.assertTrue(raw["ai"]["api_keys"][0]["value"].startswith("enc:"))
+
+        reloaded = SettingsService(self.settings_file)
+        ai = reloaded.get_ai_settings()
+        self.assertEqual(ai["api_key"], "sk-test-secret")
+        self.assertEqual(ai["api_keys"][0]["value"], "sk-test-secret")
+        self.assertEqual(ai["api_keys"][0]["access_mode"], "api")
+        self.assertEqual(ai["api_keys"][0]["provider"], "deepseek")
+
+    def test_legacy_single_ai_key_migrates_to_key_list(self):
+        with open(self.settings_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "app": {"name": "灵测 LingCe"},
+                "exam": {"rules": [{"type": "single", "name": "单选题", "count": 1, "score": 1}]},
+                "ai": {"api_key": "legacy-key"},
+            }, f)
+
+        service = SettingsService(self.settings_file)
+        ai = service.get_ai_settings()
+
+        self.assertEqual(ai["api_key"], "legacy-key")
+        self.assertEqual(ai["api_keys"][0]["value"], "legacy-key")
+        self.assertEqual(ai["api_keys"][0]["access_mode"], "api")
+
+    def test_ai_keys_keep_provider_scope(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["ai"].update({
+            "access_mode": "api",
+            "provider": "deepseek",
+            "provider_name": "DeepSeek",
+            "api_key": "deepseek-key",
+            "selected_key_id": "deepseek-main",
+            "api_keys": [
+                {
+                    "id": "deepseek-main",
+                    "name": "DeepSeek Key",
+                    "value": "deepseek-key",
+                    "access_mode": "api",
+                    "provider": "deepseek",
+                    "provider_name": "DeepSeek",
+                },
+                {
+                    "id": "kimi-main",
+                    "name": "Kimi Key",
+                    "value": "kimi-key",
+                    "access_mode": "api",
+                    "provider": "kimi",
+                    "provider_name": "Moonshot AI / Kimi",
+                },
+            ],
+        })
+
+        service.save_settings(settings)
+        reloaded = SettingsService(self.settings_file)
+        keys = reloaded.get_ai_settings()["api_keys"]
+
+        self.assertEqual({item["provider"] for item in keys}, {"deepseek", "kimi"})
+        self.assertEqual(reloaded.get_ai_settings()["api_key"], "deepseek-key")
+
 
 class TestAIService(unittest.TestCase):
     """AIService 测试"""
@@ -420,6 +494,25 @@ class TestAIService(unittest.TestCase):
         self.assertIn("只返回 JSON", prompt)
         self.assertIn('"answer"', prompt)
         self.assertIn("答案返回多个选项字母", prompt)
+
+    def test_parse_openai_compatible_model_list(self):
+        data = {"data": [{"id": "model-b"}, {"id": "model-a"}]}
+
+        models = AIService._parse_model_list(data)
+
+        self.assertEqual(models, ["model-a", "model-b"])
+
+    def test_parse_gemini_native_model_list(self):
+        data = {
+            "models": [
+                {"name": "models/gemini-2.0-flash", "supportedGenerationMethods": ["generateContent"]},
+                {"name": "models/text-embedding-004", "supportedGenerationMethods": ["embedContent"]},
+            ]
+        }
+
+        models = AIService._parse_model_list(data)
+
+        self.assertEqual(models, ["gemini-2.0-flash"])
 
 
 class TestQuestionService(unittest.TestCase):

@@ -9,7 +9,7 @@ from core.ai_presets import get_default_ai_settings
 
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    "version": "0.1.0",
+    "version": "0.1.2",
     "app": {
         "name": "灵测 LingCe",
         "subtitle": "通用考试练习平台",
