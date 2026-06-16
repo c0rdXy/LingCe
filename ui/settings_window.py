@@ -18,6 +18,7 @@ from core.ai_presets import (
     provider_name_from_id,
 )
 from core.config import DEFAULT_FONT, BOLD_FONT, get_font, get_theme_colors, THEMES
+from core.default_settings import DEFAULT_SETTINGS
 from services.ai_service import AIService, AIServiceError
 from services.settings_service import SettingsService
 from ui.components import center_window
@@ -379,7 +380,7 @@ class SettingsWindow:
             })
 
         return {
-            "version": "0.1.2",
+            "version": DEFAULT_SETTINGS["version"],
             "app": {
                 "name": self.app_name_var.get().strip(),
                 "subtitle": self.subtitle_var.get().strip(),

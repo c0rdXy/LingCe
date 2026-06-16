@@ -6,7 +6,7 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES, get_theme_colors
 from core.models import QuestionBank, Question
 from core.utils import format_judge_answer
@@ -40,6 +40,7 @@ class PracticeModeWindow:
         # 回调函数
         self.on_return_to_main = None
         self.on_wrong_questions = None  # 错题记录回调
+        self.on_clear_wrong_questions = None
         
         # 持久化 & 收藏
         self.user_data = UserDataService()
@@ -48,6 +49,7 @@ class PracticeModeWindow:
         self._collected_only = False  # 是否只练习收藏题目
         self._practice_range = "all"
         self._selected_question_type = "all"
+        self._last_wrong_review_ids: set[int] = set()
         self.range_var = tk.StringVar(value=self._practice_range)
         self.ai_histories: Dict[int, list] = {}
 
@@ -126,6 +128,7 @@ class PracticeModeWindow:
         practice_menu = tk.Menu(menubar, tearoff=0, **menu_opts)
         menubar.add_cascade(label="练习", menu=practice_menu)
         practice_menu.add_command(label="重置统计", command=self.reset_statistics)
+        practice_menu.add_command(label="清空错题", command=self.clear_wrong_questions)
         practice_menu.add_command(label="错题复习", command=self.review_wrong_questions)
         practice_menu.add_command(label="随机打乱", command=self.shuffle_questions)
         
@@ -317,7 +320,8 @@ class PracticeModeWindow:
             if self.start_practice_session(self._selected_question_type, restore_progress=False):
                 return
         if saved_range == "wrong":
-            if self.review_wrong_questions(show_tip=False, restore_progress=False):
+            question_type = progress.get("selected_type", "all")
+            if self.review_wrong_questions(show_tip=False, restore_progress=False, question_type=question_type):
                 return
         if saved_range == "all":
             self._practice_range = "all"
@@ -343,16 +347,21 @@ class PracticeModeWindow:
         self._collected_only = progress.get("collected_only", False)
         self._selected_question_type = progress.get("selected_type", "all")
 
-        if self._selected_question_type == "wrong":
+        if progress.get("practice_range") == "wrong" or self._selected_question_type == "wrong":
             return self.review_wrong_questions(
                 show_tip=False,
                 restore_progress=True,
                 practice_range="continue",
+                question_type=progress.get("selected_type", "all"),
             )
         return self.start_practice_session(self._selected_question_type, restore_progress=True)
 
     def change_practice_range(self, range_key: str):
         """切换练习范围。"""
+        if range_key == self._practice_range and range_key != "continue":
+            self.range_var.set(self._practice_range)
+            return
+
         previous_range = self._practice_range
         previous_collected = self._collected_only
         previous_type = self._selected_question_type
@@ -696,7 +705,29 @@ class PracticeModeWindow:
     
     def change_question_type(self, question_type: str):
         """切换题型"""
-        if self._practice_range in ("wrong", "continue"):
+        if question_type == self._selected_question_type:
+            return
+
+        if self._practice_range == "wrong":
+            if self.review_wrong_questions(
+                show_tip=False,
+                restore_progress=False,
+                practice_range="wrong",
+                question_type=question_type,
+            ):
+                self._save_progress()
+            return
+        if self._practice_range == "continue":
+            progress = self.user_data.get_progress(self.file_path) if self.file_path else {}
+            if progress.get("practice_range") == "wrong":
+                if self.review_wrong_questions(
+                    show_tip=False,
+                    restore_progress=False,
+                    practice_range="wrong",
+                    question_type=question_type,
+                ):
+                    self._save_progress()
+                return
             self._practice_range = "all"
             self._collected_only = False
             self.range_var.set("all")
@@ -924,23 +955,45 @@ class PracticeModeWindow:
         """重置统计"""
         if show_message_dialog("确认", "确定要重置练习统计吗？", "question"):
             self.question_service.reset_practice_statistics()
-            self.update_statistics_display()
+            self._switch_to_all_questions()
+
+    def clear_wrong_questions(self):
+        """清空当前题库的错题记录，并回到全部题目。"""
+        if not self._get_wrong_review_questions():
+            show_message_dialog("提示", "当前没有错题可清空", "info")
+            self._switch_to_all_questions()
+            return
+        if not show_message_dialog("确认", "确定要清空当前题库的错题记录吗？", "question"):
+            return
+
+        if self.file_path:
+            self.user_data.clear_wrong_history(self.file_path)
+        if self.question_service.practice_session:
+            self.question_service.practice_session.wrong_questions.clear()
+        self._last_wrong_review_ids.clear()
+        if self.on_clear_wrong_questions:
+            self.on_clear_wrong_questions()
+        self._switch_to_all_questions()
+        show_message_dialog("提示", "错题记录已清空", "info")
     
     def review_wrong_questions(
         self,
         show_tip: bool = True,
         restore_progress: bool = False,
         practice_range: str = "wrong",
+        question_type: str = "all",
     ) -> bool:
         """复习错题"""
         wrong_questions = self._get_wrong_review_questions()
-        if self.question_service.start_review_session(wrong_questions, "wrong"):
+        filtered_questions = self.question_service.filter_question_list_by_type(wrong_questions, question_type)
+        if self.question_service.start_review_session(filtered_questions, question_type):
             self._practice_range = practice_range
             self.range_var.set(practice_range)
             self._collected_only = False
-            self._selected_question_type = "wrong"
+            self._selected_question_type = question_type
+            self._last_wrong_review_ids = {question.id for question in wrong_questions}
             if restore_progress:
-                self._restore_progress("wrong")
+                self._restore_progress(question_type)
             self.show_current_question()
             self.update_statistics_display()
             self.update_button_states()
@@ -951,20 +1004,24 @@ class PracticeModeWindow:
         else:
             self.range_var.set(self._practice_range)
             if show_tip:
-                show_message_dialog("提示", "暂无错题可复习", "info")
+                message = "暂无错题可复习" if question_type == "all" else f"暂无{self.get_type_name(question_type)}错题可复习"
+                show_message_dialog("提示", message, "info")
             return False
 
-    def _get_wrong_review_questions(self):
+    def _get_wrong_review_questions(self) -> List[Question]:
         """合并当前会话错题和历史错题，作为错题复习范围。"""
-        questions_by_id = {}
-        for question in self.question_service.get_wrong_questions():
-            questions_by_id[question.id] = question
-        if self.file_path and self.question_service.question_bank:
-            for question_id in self.user_data.get_wrong_history(self.file_path):
-                question = self.question_service.question_bank.get_question_by_id(question_id)
-                if question:
-                    questions_by_id[question.id] = question
-        return list(questions_by_id.values())
+        question_bank = self.question_service.question_bank
+        if not question_bank:
+            return []
+
+        wrong_ids = set()
+        if self.file_path:
+            wrong_ids.update(self.user_data.get_wrong_history(self.file_path))
+        if self.question_service.practice_session:
+            wrong_ids.update(self.question_service.practice_session.wrong_questions)
+        wrong_ids.update(self._last_wrong_review_ids)
+
+        return [question for question in question_bank.questions if question.id in wrong_ids]
     
     def shuffle_questions(self):
         """打乱题目顺序"""
@@ -1084,6 +1141,10 @@ class PracticeModeWindow:
     def set_wrong_questions_callback(self, callback):
         """设置错题记录回调函数"""
         self.on_wrong_questions = callback
+
+    def set_clear_wrong_questions_callback(self, callback):
+        """设置清空错题回调函数。"""
+        self.on_clear_wrong_questions = callback
     
     def toggle_favorite(self):
         """切换收藏状态"""
@@ -1166,10 +1227,21 @@ class PracticeModeWindow:
                 if 0 <= idx < len(session.questions):
                     session.current_question_index = idx
 
+    def _switch_to_all_questions(self):
+        """切回全部题目并刷新练习状态。"""
+        self._practice_range = "all"
+        self._collected_only = False
+        self._selected_question_type = "all"
+        self.range_var.set("all")
+        if self.start_practice_session("all", restore_progress=False):
+            self._save_progress()
+
     def record_wrong_answer(self):
         """记录错题"""
+        current_question = self.question_service.get_current_question()
+        if current_question:
+            self._last_wrong_review_ids.add(current_question.id)
         if self.on_wrong_questions:
-            current_question = self.question_service.get_current_question()
             if current_question:
                 # 直接传递题目ID而不是索引
                 self.on_wrong_questions([current_question.id])

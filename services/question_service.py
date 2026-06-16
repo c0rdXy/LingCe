@@ -184,6 +184,26 @@ class QuestionService:
             selected_type=selected_type
         )
         return True
+
+    @staticmethod
+    def filter_question_list_by_type(questions: List[Question], question_type: str) -> List[Question]:
+        """从给定题目列表中按题型筛选，保留常见等价题型兼容。"""
+        if question_type in ("all", "wrong"):
+            return list(questions)
+
+        filtered = [question for question in questions if question.type == question_type]
+        if filtered:
+            return filtered
+
+        aliases = {
+            "judge": ("judgement", "judge"),
+            "judgement": ("judge", "judgement"),
+            "short": ("short", "essay", "fill"),
+            "essay": ("short", "essay", "fill"),
+            "fill": ("fill", "short"),
+        }
+        allowed_types = aliases.get(question_type, (question_type,))
+        return [question for question in questions if question.type in allowed_types]
     
     def get_practice_statistics(self) -> Dict[str, Any]:
         """获取练习统计信息"""

@@ -82,6 +82,7 @@ class QuizApplication:
         practice_window.set_return_callback(self.return_to_main)
         # 设置错题记录回调
         practice_window.set_wrong_questions_callback(self.main_window.add_wrong_questions)
+        practice_window.set_clear_wrong_questions_callback(self.main_window.clear_wrong_questions)
         
         self.current_window = practice_window
     

@@ -18,6 +18,7 @@ from services.settings_service import SettingsService
 from services.ai_service import AIService, AIServiceError
 from core.ai_presets import get_providers
 import services.exam_db as exam_db
+from ui.practice_mode import PracticeModeWindow
 from ui.exam_mode import ExamModeWindow
 
 
@@ -171,6 +172,7 @@ class TestUserDataService(unittest.TestCase):
     def test_default_data(self):
         self.assertEqual(self.ud.get_theme(), "light")
         self.assertEqual(self.ud.get_last_file(), "")
+        self.assertNotIn("theme", self.ud.export_data())
 
     def test_set_and_get_theme(self):
         self.ud.set_theme("dark")
@@ -206,10 +208,36 @@ class TestUserDataService(unittest.TestCase):
         self.ud.add_wrong_questions("bank.json", [2, 3])
         self.assertEqual(self.ud.get_wrong_history("bank.json"), [1, 2, 3])
 
+    def test_wrong_history_matches_equivalent_paths(self):
+        bank_path = os.path.abspath("tmp-test-bank.json")
+        self.ud.add_wrong_questions(bank_path, [1, 2])
+
+        relative_path = os.path.relpath(bank_path, os.getcwd())
+
+        self.assertEqual(self.ud.get_wrong_history(relative_path), [1, 2])
+
+    def test_wrong_history_matches_slash_variants(self):
+        self.ud.add_wrong_questions(r"question_banks\bank.json", [3, 4])
+
+        self.assertEqual(self.ud.get_wrong_history("question_banks/bank.json"), [3, 4])
+
+    def test_wrong_history_matches_same_file_name(self):
+        self.ud.add_wrong_questions(r"question_banks\bank.json", [5, 6])
+
+        self.assertEqual(self.ud.get_wrong_history("D:/other/path/bank.json"), [5, 6])
+
     def test_clear_wrong_history(self):
         self.ud.add_wrong_questions("bank.json", [1, 2])
         self.ud.clear_wrong_history("bank.json")
         self.assertEqual(self.ud.get_wrong_history("bank.json"), [])
+
+    def test_clear_wrong_history_removes_same_file_name_aliases(self):
+        self.ud.add_wrong_questions(r"old_path\bank.json", [1, 2])
+        self.assertEqual(self.ud.get_wrong_history("new_path/bank.json"), [1, 2])
+
+        self.ud.clear_wrong_history("new_path/bank.json")
+
+        self.assertEqual(self.ud.get_wrong_history("new_path/bank.json"), [])
 
     def test_progress(self):
         self.ud.save_progress("bank.json", {"current_index": 42, "type": "single"})
@@ -533,6 +561,51 @@ class TestQuestionService(unittest.TestCase):
         service = QuestionService()
 
         self.assertFalse(service.start_review_session([], "wrong"))
+
+    def test_filter_question_list_by_type_keeps_review_scope(self):
+        questions = [
+            Question(id=1, type="single", question="Q1", options=["A. X", "B. Y"], answer="A"),
+            Question(id=2, type="multiple", question="Q2", options=["A. X", "B. Y"], answer="AB"),
+            Question(id=3, type="judge", question="Q3", options=[], answer="A"),
+        ]
+
+        filtered = QuestionService.filter_question_list_by_type(questions, "single")
+
+        self.assertEqual([question.id for question in filtered], [1])
+
+    def test_wrong_review_pool_survives_filtered_review_session(self):
+        bank = QuestionBank(
+            questions=[
+                Question(id=1, type="single", question="Q1"),
+                Question(id=2, type="multiple", question="Q2"),
+                Question(id=3, type="judge", question="Q3"),
+            ],
+            file_path="bank.json",
+        )
+        service = QuestionService()
+        service.set_question_bank(bank)
+        data_file = os.path.join(tempfile.gettempdir(), "wrong_pool_test.json")
+        if os.path.exists(data_file):
+            os.remove(data_file)
+        user_data = UserDataService(data_file)
+
+        try:
+            user_data.add_wrong_questions("bank.json", [1, 2, 3])
+            window = PracticeModeWindow.__new__(PracticeModeWindow)
+            window.question_service = service
+            window.user_data = user_data
+            window.file_path = "bank.json"
+            window._last_wrong_review_ids = set()
+
+            single_wrong = service.filter_question_list_by_type(window._get_wrong_review_questions(), "single")
+            self.assertTrue(service.start_review_session(single_wrong, "single"))
+            window._last_wrong_review_ids = {1, 2, 3}
+
+            all_wrong = window._get_wrong_review_questions()
+            self.assertEqual([question.id for question in all_wrong], [1, 2, 3])
+        finally:
+            if os.path.exists(data_file):
+                os.remove(data_file)
 
 
 class TestQuestionBankBuilder(unittest.TestCase):

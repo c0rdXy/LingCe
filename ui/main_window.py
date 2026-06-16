@@ -53,6 +53,7 @@ class MainWindow:
         if self.settings_service.has_settings_file():
             set_theme(self.settings_service.get_app_settings().get("default_theme", "light"))
         else:
+            # 兼容旧版本写在用户数据里的主题，新版本统一保存到 settings.json。
             saved_theme = self.user_data.get_theme()
             set_theme(saved_theme)
             self.settings_service.set_runtime_default_theme(saved_theme)
@@ -83,8 +84,7 @@ class MainWindow:
             return False
         if not question_bank:
             return False
-        self.update_question_bank_info(question_bank)
-        self.enable_function_buttons()
+        self._on_question_bank_loaded(self.file_service.current_file_path or file_path)
         return True
 
     def setup_window(self):
@@ -299,7 +299,6 @@ class MainWindow:
     def _switch_theme(self, theme_name: str):
         """切换主题"""
         set_theme(theme_name)
-        self.user_data.set_theme(theme_name)
         self._save_default_theme(theme_name)
         self._apply_theme()
         self.create_main_interface()
@@ -347,34 +346,41 @@ class MainWindow:
         frame = tk.Frame(parent, bg=tc["bg"])
         frame.pack(fill="x", pady=20)
 
-        btns = tk.Frame(frame, bg=tc["bg"])
-        btns.pack()
+        primary_row = tk.Frame(frame, bg=tc["bg"])
+        primary_row.pack()
 
         self.practice_btn = tk.Button(
-            btns, text="练习模式", font=BOLD_FONT, width=15, height=2,
+            primary_row, text="练习模式", font=get_font(11, "bold"), width=18, height=2,
             bg=COLORS["success"], fg="white", command=self.start_practice_mode,
-            state="disabled",
+            state="disabled", cursor="hand2",
         )
-        self.practice_btn.pack(side="left", padx=10)
+        self.practice_btn.pack(side="left", padx=12)
 
         self.exam_btn = tk.Button(
-            btns, text="考试模式", font=BOLD_FONT, width=15, height=2,
+            primary_row, text="考试模式", font=get_font(11, "bold"), width=18, height=2,
             bg=COLORS["primary"], fg="white", command=self.start_exam_mode,
-            state="disabled",
+            state="disabled", cursor="hand2",
         )
-        self.exam_btn.pack(side="left", padx=10)
+        self.exam_btn.pack(side="left", padx=12)
 
-        self.wrong_btn = tk.Button(
-            btns, text="导出错题集", font=BOLD_FONT, width=15, height=2,
-            bg=COLORS["danger"], fg="white", command=self.export_wrong_questions,
-        )
-        self.wrong_btn.pack(side="left", padx=10)
+        tool_row = tk.Frame(frame, bg=tc["bg"])
+        tool_row.pack(pady=(16, 0))
 
         self.builder_btn = tk.Button(
-            btns, text="生成题库", font=BOLD_FONT, width=15, height=2,
-            bg=COLORS["warning"], fg="white", command=self.show_question_bank_builder,
+            tool_row, text="生成题库", font=DEFAULT_FONT, width=15, height=1,
+            bg=tc["bg_secondary"], fg=tc["text"], activebackground=tc["card_bg"],
+            activeforeground=tc["text"], relief="groove", bd=1,
+            command=self.show_question_bank_builder, cursor="hand2",
         )
         self.builder_btn.pack(side="left", padx=10)
+
+        self.wrong_btn = tk.Button(
+            tool_row, text="导出错题集", font=DEFAULT_FONT, width=15, height=1,
+            bg=tc["bg_secondary"], fg=tc["text"], activebackground=tc["card_bg"],
+            activeforeground=tc["text"], relief="groove", bd=1,
+            command=self.export_wrong_questions, cursor="hand2",
+        )
+        self.wrong_btn.pack(side="left", padx=10)
 
     def _create_footer(self, parent, tc):
         footer = tk.Frame(parent, bg=tc["header_bg"], height=40)
@@ -404,9 +410,7 @@ class MainWindow:
     def load_question_bank(self):
         question_bank = self.file_service.load_question_bank()
         if question_bank:
-            self.user_data.set_last_file(self.file_service.current_file_path or "")
-            self.update_question_bank_info(question_bank)
-            self.enable_function_buttons()
+            self._on_question_bank_loaded(self.file_service.current_file_path or "")
 
     def show_question_bank_builder(self):
         """打开手工题库创建窗口。"""
@@ -418,10 +422,15 @@ class MainWindow:
         if not question_bank:
             show_message_dialog("错误", "生成的题库加载失败", "error")
             return
-        self.user_data.set_last_file(file_path)
-        self.update_question_bank_info(question_bank)
-        self.enable_function_buttons()
+        self._on_question_bank_loaded(file_path)
         show_message_dialog("成功", "题库已生成并加载", "info")
+
+    def _on_question_bank_loaded(self, file_path: str):
+        """题库加载后的统一状态刷新。"""
+        self.user_data.set_last_file(file_path)
+        self._load_wrong_history_for_current_bank()
+        self.update_question_bank_info(self.file_service.question_bank)
+        self.enable_function_buttons()
 
     def update_question_bank_info(self, question_bank):
         file_info = self.file_service.get_file_info()
@@ -484,20 +493,43 @@ class MainWindow:
     # ------------------------------------------------------------------ #
 
     def add_wrong_questions(self, question_ids):
+        added_ids = []
         for item in question_ids:
             if isinstance(item, list):
                 for qid in item:
                     if qid not in self.wrong_questions_history:
                         self.wrong_questions_history.append(qid)
+                    added_ids.append(qid)
             else:
                 if item not in self.wrong_questions_history:
                     self.wrong_questions_history.append(item)
+                added_ids.append(item)
 
         # 持久化
-        if self.file_service.current_file_path:
+        if self.file_service.current_file_path and added_ids:
             self.user_data.add_wrong_questions(
-                self.file_service.current_file_path, self.wrong_questions_history
+                self.file_service.current_file_path, added_ids
             )
+
+    def _load_wrong_history_for_current_bank(self):
+        """从用户数据中恢复当前题库的错题历史。"""
+        file_path = self.file_service.current_file_path
+        question_bank = self.file_service.question_bank
+        if not file_path or not question_bank:
+            self.wrong_questions_history = []
+            return
+        valid_ids = {question.id for question in question_bank.questions}
+        self.wrong_questions_history = [
+            question_id
+            for question_id in self.user_data.get_wrong_history(file_path)
+            if question_id in valid_ids
+        ]
+
+    def clear_wrong_questions(self):
+        """清空当前题库的错题历史。"""
+        self.wrong_questions_history = []
+        if self.file_service.current_file_path:
+            self.user_data.clear_wrong_history(self.file_service.current_file_path)
 
     def export_wrong_questions(self):
         if not self.file_service.question_bank:
@@ -529,7 +561,6 @@ class MainWindow:
         default_theme = self.settings_service.get_app_settings().get("default_theme")
         if default_theme in THEMES:
             set_theme(default_theme)
-            self.user_data.set_theme(default_theme)
         self._apply_theme()
         self.create_main_interface()
         if self.file_service.question_bank:

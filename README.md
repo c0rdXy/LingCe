@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-125%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-131%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -90,7 +90,7 @@ LingCe/
 ├── question_banks/         # 示例题库与本地生成题库
 ├── data/                   # 本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（124 个）
+├── tests/                  # 单元测试（131 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```
@@ -129,7 +129,9 @@ LingCe/
 
 - `question_banks/题库.json` 是项目自带示例题库，首次运行且没有历史题库时会自动加载。
 - 手工生成和导出的题库默认保存到 `question_banks/`，用于和系统运行数据分开管理。
-- `data/user_data.json`、`data/settings.json`、`data/exam_history.db` 是运行时生成的本地数据，不参与 Git 提交。
+- `data/settings.json` 保存系统配置，例如主题、考试规则和 AI 设置。
+- `data/user_data.json` 保存用户运行数据，例如最近题库、练习进度、错题历史、收藏和统计，不参与 Git 提交。
+- `data/exam_history.db` 保存考试历史，不参与 Git 提交。
 - `data/user_data.example.json` 是用户数据结构示例。
 
 ## ✅ 发布检查
