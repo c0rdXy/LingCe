@@ -24,6 +24,7 @@ from services.question_bank_builder import (
     QuestionDraft,
 )
 from services.ai_service import AIService, AIServiceError
+from services.document_import_service import DocumentImportError, DocumentImportService
 from ui.ai_review_window import show_ai_review_window
 from ui.components import center_window
 
@@ -54,6 +55,8 @@ class QuestionBankBuilderWindow:
         self._dirty = False
         self._loading_draft = False
         self.ai_histories = {}
+        self.import_service = DocumentImportService()
+        self.import_source_path = ""
 
         self.window = tk.Toplevel(parent)
         self.window.title("生成题库")
@@ -79,25 +82,251 @@ class QuestionBankBuilderWindow:
         self.option_entries = []
         self.visible_option_count = 4
         self.answer_focus_widgets = []
+        self.import_count_var = tk.StringVar(value="auto")
+        self.import_difficulty_var = tk.StringVar(value="auto")
+        self.import_explanation_var = tk.BooleanVar(value=True)
+        self.import_type_vars = {
+            qtype: tk.BooleanVar(value=True)
+            for qtype in QUESTION_TYPE_LABELS
+        }
+        self.import_status_var = tk.StringVar(value="请选择文件或粘贴文本。")
 
     def _create_ui(self):
         toolbar = tk.Frame(self.window, bg=self.tc["bg"])
         toolbar.pack(fill="x", padx=12, pady=(12, 6))
         tk.Label(
             toolbar,
-            text="手工创建题库",
+            text="生成题库",
             font=get_font(16, "bold"),
             bg=self.tc["bg"],
             fg=self.tc["primary"],
         ).pack(side="left")
         ttk.Button(toolbar, text="题目模板", command=self.apply_template).pack(side="left", padx=(16, 0))
         ttk.Button(toolbar, text="保存题库", command=self.save_question_bank).pack(side="right")
+        ttk.Button(toolbar, text="清除题库", command=self.clear_question_bank).pack(side="right", padx=(0, 8))
 
-        body = tk.Frame(self.window, bg=self.tc["bg"])
-        body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        notebook = ttk.Notebook(self.window)
+        notebook.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        manual_tab = tk.Frame(notebook, bg=self.tc["bg"])
+        import_tab = tk.Frame(notebook, bg=self.tc["bg"])
+        notebook.add(manual_tab, text="手工创建")
+        notebook.add(import_tab, text="AI 解析导入")
+
+        body = tk.Frame(manual_tab, bg=self.tc["bg"])
+        body.pack(fill="both", expand=True)
 
         self._create_list_panel(body)
         self._create_editor_panel(body)
+        self._create_import_tab(import_tab)
+
+    def _create_import_tab(self, parent):
+        top = tk.Frame(parent, bg=self.tc["bg"])
+        top.pack(fill="x", pady=(8, 10))
+
+        ttk.Button(top, text="选择文件", command=self.select_import_file).pack(side="left")
+        ttk.Button(top, text="清空内容", command=self.clear_import_text).pack(side="left", padx=(8, 0))
+        ttk.Button(top, text="使用当前编辑题目", command=self.focus_manual_tab).pack(side="right")
+
+        self.import_file_label = tk.Label(
+            parent,
+            text="支持 TXT / Markdown / CSV / Word(.docx) / Excel(.xlsx) / PDF",
+            font=get_font(9),
+            bg=self.tc["bg"],
+            fg=self.tc["text_secondary"],
+            anchor="w",
+        )
+        self.import_file_label.pack(fill="x", pady=(0, 6))
+
+        preview_frame = tk.LabelFrame(
+            parent,
+            text="来源内容预览",
+            font=BOLD_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc["text"],
+        )
+        preview_frame.pack(fill="both", expand=True)
+        self.import_text = scrolledtext.ScrolledText(
+            preview_frame,
+            height=14,
+            wrap=tk.WORD,
+            font=DEFAULT_FONT,
+            bg=self.tc["bg_secondary"],
+            fg=self.tc["text"],
+            insertbackground=self.tc["text"],
+        )
+        self.import_text.pack(fill="both", expand=True, padx=10, pady=10)
+
+        settings = tk.LabelFrame(
+            parent,
+            text="解析设置",
+            font=BOLD_FONT,
+            bg=self.tc["bg"],
+            fg=self.tc["text"],
+        )
+        settings.pack(fill="x", pady=(10, 8))
+
+        first_row = tk.Frame(settings, bg=self.tc["bg"])
+        first_row.pack(fill="x", padx=10, pady=(8, 4))
+        tk.Label(first_row, text="题目数量", bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left")
+        ttk.Combobox(
+            first_row,
+            textvariable=self.import_count_var,
+            values=["auto", "5", "10", "20", "30", "50"],
+            width=8,
+            state="readonly",
+        ).pack(side="left", padx=(8, 18))
+        tk.Label(first_row, text="难度", bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left")
+        ttk.Combobox(
+            first_row,
+            textvariable=self.import_difficulty_var,
+            values=["auto", "easy", "normal", "hard"],
+            width=10,
+            state="readonly",
+        ).pack(side="left", padx=(8, 18))
+        ttk.Checkbutton(first_row, text="生成解析", variable=self.import_explanation_var).pack(side="left")
+
+        type_row = tk.Frame(settings, bg=self.tc["bg"])
+        type_row.pack(fill="x", padx=10, pady=(4, 8))
+        tk.Label(type_row, text="题型范围", bg=self.tc["bg"], fg=self.tc["text"]).pack(side="left", padx=(0, 8))
+        for qtype, label in QUESTION_TYPE_LABELS.items():
+            ttk.Checkbutton(type_row, text=label, variable=self.import_type_vars[qtype]).pack(side="left", padx=(0, 10))
+
+        footer = tk.Frame(parent, bg=self.tc["bg"])
+        footer.pack(fill="x")
+        tk.Label(
+            footer,
+            textvariable=self.import_status_var,
+            bg=self.tc["bg"],
+            fg=self.tc["text_secondary"],
+            anchor="w",
+            font=get_font(9),
+        ).pack(side="left", fill="x", expand=True)
+        self.ai_import_btn = ttk.Button(footer, text="AI 解析生成题库", command=self.generate_questions_from_import)
+        self.ai_import_btn.pack(side="right")
+
+    def focus_manual_tab(self):
+        """占位按钮保留用户从导入页回到编辑页的直觉入口。"""
+        for widget in self.window.winfo_children():
+            if isinstance(widget, ttk.Notebook):
+                widget.select(0)
+                return
+
+    def select_import_file(self):
+        """选择资料文件并提取文本。"""
+        file_path = filedialog.askopenfilename(
+            parent=self.window,
+            title="选择资料文件",
+            filetypes=[
+                ("支持的资料", "*.txt *.md *.markdown *.csv *.docx *.xlsx *.pdf"),
+                ("文本文件", "*.txt *.md *.markdown"),
+                ("Office 文件", "*.docx *.xlsx"),
+                ("PDF 文件", "*.pdf"),
+                ("所有文件", "*.*"),
+            ],
+        )
+        if not file_path:
+            return
+        try:
+            text = self.import_service.extract_text(file_path)
+        except DocumentImportError as exc:
+            messagebox.showerror("提取失败", str(exc), parent=self.window)
+            return
+        if not text.strip():
+            messagebox.showwarning("提取结果为空", "没有从文件中提取到可用文本", parent=self.window)
+            return
+
+        self.import_source_path = file_path
+        self.import_text.delete("1.0", tk.END)
+        self.import_text.insert("1.0", text)
+        self.import_file_label.config(text=f"已选择：{file_path}")
+        self.import_status_var.set(f"已提取 {len(text)} 个字符，可开始 AI 解析。")
+
+    def clear_import_text(self):
+        """清空导入资料文本。"""
+        self.import_source_path = ""
+        self.import_text.delete("1.0", tk.END)
+        self.import_file_label.config(text="支持 TXT / Markdown / CSV / Word(.docx) / Excel(.xlsx) / PDF")
+        self.import_status_var.set("请选择文件或粘贴文本。")
+
+    def generate_questions_from_import(self):
+        """调用 AI 将资料文本解析为题目草稿。"""
+        source_text = self.import_text.get("1.0", "end-1c").strip()
+        if not source_text:
+            messagebox.showwarning("AI 解析导入", "请先选择文件或粘贴资料文本", parent=self.window)
+            return
+        selected_types = [qtype for qtype, var in self.import_type_vars.items() if var.get()]
+        if not selected_types:
+            messagebox.showwarning("AI 解析导入", "请至少选择一种题型", parent=self.window)
+            return
+
+        self.ai_import_btn.config(state="disabled")
+        self.import_status_var.set("AI 正在解析资料，请稍候...")
+
+        def worker():
+            try:
+                drafts = AIService().generate_questions_from_text(
+                    source_text=source_text,
+                    question_count=self.import_count_var.get(),
+                    question_types=selected_types,
+                    include_explanation=self.import_explanation_var.get(),
+                    difficulty=self.import_difficulty_var.get(),
+                )
+                self.window.after(0, lambda: self._apply_imported_drafts(drafts))
+            except AIServiceError as exc:
+                message = str(exc)
+                self.window.after(0, lambda: self._on_import_error(message))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_imported_drafts(self, drafts):
+        """把 AI 解析结果载入手工编辑器供人工复核。"""
+        self.ai_import_btn.config(state="normal")
+        if not drafts:
+            self.import_status_var.set("AI 未生成题目。")
+            messagebox.showwarning("AI 解析导入", "AI 未生成题目", parent=self.window)
+            return
+
+        if self._has_meaningful_drafts():
+            replace = messagebox.askyesno(
+                "载入解析结果",
+                "当前编辑器已有题目，是否用 AI 解析结果替换？",
+                parent=self.window,
+            )
+            if not replace:
+                self.import_status_var.set("已取消载入 AI 解析结果。")
+                return
+
+        self.drafts = drafts
+        self.current_index = 0
+        self._dirty = True
+        self.ai_histories = {}
+        self._refresh_list()
+        self._load_current_draft()
+        self.focus_manual_tab()
+
+        invalid_count = sum(1 for draft in drafts if self.builder.validate_draft(draft))
+        if invalid_count:
+            message = f"AI 已生成 {len(drafts)} 道题，其中 {invalid_count} 道需要人工补充或修正。"
+        else:
+            message = f"AI 已生成 {len(drafts)} 道题，请人工复核后保存。"
+        self.import_status_var.set(message)
+        messagebox.showinfo("AI 解析完成", message, parent=self.window)
+
+    def _has_meaningful_drafts(self) -> bool:
+        """判断当前编辑器中是否已有用户填写内容。"""
+        self._store_current_draft(validate=False, show_errors=False)
+        for draft in self.drafts:
+            if draft.question.strip() or draft.answer.strip() or draft.explanation.strip():
+                return True
+            if any(str(option).strip() for option in draft.options):
+                return True
+        return False
+
+    def _on_import_error(self, message: str):
+        self.ai_import_btn.config(state="normal")
+        self.import_status_var.set("AI 解析失败。")
+        messagebox.showerror("AI 解析失败", message, parent=self.window)
 
     def _create_list_panel(self, parent):
         panel = tk.LabelFrame(
@@ -664,6 +893,22 @@ class QuestionBankBuilderWindow:
         self._refresh_list()
         self._load_current_draft()
         self._queue_auto_save()
+
+    def clear_question_bank(self):
+        """清空当前编辑器中的题库草稿。"""
+        if not messagebox.askyesno(
+            "清除题库",
+            "确定要清除当前题库中的所有题目吗？此操作不会删除已保存的题库文件。",
+            parent=self.window,
+        ):
+            return
+        self.drafts = [self.builder.new_draft()]
+        self.current_index = 0
+        self.ai_histories = {}
+        self._dirty = False
+        self._refresh_list()
+        self._load_current_draft()
+        self.import_status_var.set("当前编辑器已清空。")
 
     def save_question_bank(self):
         if not self._store_current_draft(validate=True, show_errors=True):

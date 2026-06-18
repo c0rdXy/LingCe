@@ -1,0 +1,9 @@
+﻿type,type_name,question,option_a,option_b,option_c,option_d,answer,explanation
+single,单选题,Python 中用于定义函数的关键字是哪一个？,class,def,return,import,B,Python 使用 def 关键字定义函数。
+multiple,多选题,下列哪些属于常见的关系型数据库？,MySQL,PostgreSQL,Redis,SQLite,ABD,MySQL、PostgreSQL、SQLite 是关系型数据库；Redis 通常是键值型内存数据库。
+judgement,判断题,HTTP 状态码 404 通常表示服务器内部错误。,,,,,错误,404 表示资源未找到；服务器内部错误通常是 500。
+fill,填空题,在 Git 中，用于查看当前工作区状态的命令是 git ____。,,,,,status,git status 可查看暂存区、工作区和分支状态。
+short,简答题,请简述单元测试的主要作用。,,,,,单元测试用于验证最小代码单元的行为是否符合预期，帮助尽早发现回归问题，并提升代码修改时的信心。,答案应包含验证功能、发现问题、降低回归风险等要点。
+single,单选题,在计算机网络中，DNS 的主要作用是什么？,加密网络通信,把域名解析为 IP 地址,压缩网页内容,检测硬盘坏道,B,DNS 负责域名和 IP 地址之间的解析。
+multiple,多选题,下列哪些做法有助于保护账号安全？,启用双因素认证,多个网站使用同一个简单密码,定期更新密码,不随意点击陌生链接,ACD,双因素认证、定期更新密码、不点击陌生链接都有助于安全；复用简单密码风险较高。
+judgement,判断题,JSON 是一种常见的数据交换格式。,,,,,正确,JSON 结构清晰、易读，常用于接口数据交换。

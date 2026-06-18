@@ -1,0 +1,86 @@
+[
+  {
+    "type": "single",
+    "type_name": "单选题",
+    "question": "Python 中用于定义函数的关键字是哪一个？",
+    "options": [
+      "class",
+      "def",
+      "return",
+      "import"
+    ],
+    "answer": "B",
+    "explanation": "Python 使用 def 关键字定义函数。"
+  },
+  {
+    "type": "multiple",
+    "type_name": "多选题",
+    "question": "下列哪些属于常见的关系型数据库？",
+    "options": [
+      "MySQL",
+      "PostgreSQL",
+      "Redis",
+      "SQLite"
+    ],
+    "answer": "ABD",
+    "explanation": "MySQL、PostgreSQL、SQLite 是关系型数据库；Redis 通常是键值型内存数据库。"
+  },
+  {
+    "type": "judgement",
+    "type_name": "判断题",
+    "question": "HTTP 状态码 404 通常表示服务器内部错误。",
+    "options": [],
+    "answer": "错误",
+    "explanation": "404 表示资源未找到；服务器内部错误通常是 500。"
+  },
+  {
+    "type": "fill",
+    "type_name": "填空题",
+    "question": "在 Git 中，用于查看当前工作区状态的命令是 git ____。",
+    "options": [],
+    "answer": "status",
+    "explanation": "git status 可查看暂存区、工作区和分支状态。"
+  },
+  {
+    "type": "short",
+    "type_name": "简答题",
+    "question": "请简述单元测试的主要作用。",
+    "options": [],
+    "answer": "单元测试用于验证最小代码单元的行为是否符合预期，帮助尽早发现回归问题，并提升代码修改时的信心。",
+    "explanation": "答案应包含验证功能、发现问题、降低回归风险等要点。"
+  },
+  {
+    "type": "single",
+    "type_name": "单选题",
+    "question": "在计算机网络中，DNS 的主要作用是什么？",
+    "options": [
+      "加密网络通信",
+      "把域名解析为 IP 地址",
+      "压缩网页内容",
+      "检测硬盘坏道"
+    ],
+    "answer": "B",
+    "explanation": "DNS 负责域名和 IP 地址之间的解析。"
+  },
+  {
+    "type": "multiple",
+    "type_name": "多选题",
+    "question": "下列哪些做法有助于保护账号安全？",
+    "options": [
+      "启用双因素认证",
+      "多个网站使用同一个简单密码",
+      "定期更新密码",
+      "不随意点击陌生链接"
+    ],
+    "answer": "ACD",
+    "explanation": "双因素认证、定期更新密码、不点击陌生链接都有助于安全；复用简单密码风险较高。"
+  },
+  {
+    "type": "judgement",
+    "type_name": "判断题",
+    "question": "JSON 是一种常见的数据交换格式。",
+    "options": [],
+    "answer": "正确",
+    "explanation": "JSON 结构清晰、易读，常用于接口数据交换。"
+  }
+]

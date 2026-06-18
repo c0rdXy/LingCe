@@ -6,6 +6,7 @@ import unittest
 import tempfile
 import os
 import json
+import zipfile
 from pathlib import Path
 
 from core.models import Question, QuestionBank
@@ -16,6 +17,7 @@ from services.question_bank_builder import QuestionBankBuilder, QuestionDraft
 from services.user_data_service import UserDataService
 from services.settings_service import SettingsService
 from services.ai_service import AIService, AIServiceError
+from services.document_import_service import DocumentImportService
 from core.ai_presets import get_providers
 import services.exam_db as exam_db
 from ui.practice_mode import PracticeModeWindow
@@ -159,15 +161,12 @@ class TestUserDataService(unittest.TestCase):
     """UserDataService 测试"""
 
     def setUp(self):
-        self.tmpfile = os.path.join(tempfile.gettempdir(), "test_user_data.json")
-        # Clean up from previous runs
-        if os.path.exists(self.tmpfile):
-            os.remove(self.tmpfile)
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.tmpfile = os.path.join(self.tmpdir.name, "test_user_data.json")
         self.ud = UserDataService(self.tmpfile)
 
     def tearDown(self):
-        if os.path.exists(self.tmpfile):
-            os.remove(self.tmpfile)
+        self.tmpdir.cleanup()
 
     def test_default_data(self):
         self.assertEqual(self.ud.get_theme(), "light")
@@ -508,6 +507,55 @@ class TestAIService(unittest.TestCase):
         self.assertEqual(result["answer"], "B")
         self.assertEqual(result["explanation"], "解析内容")
 
+    def test_parse_imported_question_drafts_json(self):
+        content = """```json
+[
+  {
+    "type": "single",
+    "question": "测试题干",
+    "options": ["A. 测试选项一", "B. 测试选项二"],
+    "answer": "B",
+    "explanation": "测试解析"
+  }
+]
+```"""
+
+        drafts = AIService._parse_question_drafts_json(content)
+
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(drafts[0].type, "single")
+        self.assertEqual(drafts[0].options, ["测试选项一", "测试选项二"])
+        self.assertEqual(drafts[0].answer, "B")
+
+    def test_split_source_text_chunks_long_content(self):
+        text = "\n".join(f"段落{i}" for i in range(20))
+
+        chunks = AIService._split_source_text(text, max_chars=20)
+
+        self.assertGreater(len(chunks), 1)
+
+    def test_question_import_repairs_invalid_json_once(self):
+        class RepairAIService(AIService):
+            def __init__(self):
+                super().__init__()
+                self.calls = 0
+
+            def _chat(self, messages, settings, max_tokens=None):
+                self.calls += 1
+                if self.calls == 1:
+                    return "我生成了题目，但不是 JSON"
+                return '[{"type":"single","question":"修复后的题干","options":["选项一","选项二"],"answer":"A","explanation":"解析"}]'
+
+            def get_ai_settings(self):
+                return {"enabled": True, "base_url": "http://example.test", "model": "test", "api_key": "test"}
+
+        service = RepairAIService()
+
+        drafts = service.generate_questions_from_text("资料内容")
+
+        self.assertEqual(service.calls, 2)
+        self.assertEqual(drafts[0].question, "修复后的题干")
+
     def test_generate_answer_prompt_requests_json(self):
         service = AIService()
         question = Question(
@@ -606,6 +654,71 @@ class TestQuestionService(unittest.TestCase):
         finally:
             if os.path.exists(data_file):
                 os.remove(data_file)
+
+
+class TestDocumentImportService(unittest.TestCase):
+    """DocumentImportService 测试"""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.service = DocumentImportService()
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_extract_text_file(self):
+        path = Path(self.tmpdir.name) / "source.txt"
+        path.write_text("第一行\n第二行", encoding="utf-8")
+
+        text = self.service.extract_text(str(path))
+
+        self.assertIn("第一行", text)
+        self.assertIn("第二行", text)
+
+    def test_extract_csv_file(self):
+        path = Path(self.tmpdir.name) / "source.csv"
+        path.write_text("题干,答案\n测试题,A", encoding="utf-8")
+
+        text = self.service.extract_text(str(path))
+
+        self.assertIn("题干\t答案", text)
+        self.assertIn("测试题\tA", text)
+
+    def test_extract_docx_file(self):
+        path = Path(self.tmpdir.name) / "source.docx"
+        xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Word 测试内容</w:t></w:r></w:p>
+  </w:body>
+</w:document>"""
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("word/document.xml", xml)
+
+        text = self.service.extract_text(str(path))
+
+        self.assertIn("Word 测试内容", text)
+
+    def test_extract_xlsx_file(self):
+        path = Path(self.tmpdir.name) / "source.xlsx"
+        shared = """<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <si><t>题干</t></si>
+  <si><t>测试答案</t></si>
+</sst>"""
+        sheet = """<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row><c t="s"><v>0</v></c><c t="s"><v>1</v></c></row>
+  </sheetData>
+</worksheet>"""
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("xl/sharedStrings.xml", shared)
+            archive.writestr("xl/worksheets/sheet1.xml", sheet)
+
+        text = self.service.extract_text(str(path))
+
+        self.assertIn("题干\t测试答案", text)
 
 
 class TestQuestionBankBuilder(unittest.TestCase):

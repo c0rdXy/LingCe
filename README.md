@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-131%20passed-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-138%20passed-success.svg)](tests/)
 
 **灵测 LingCe** 是一个轻量、通用的开源考试练习系统，基于 Python + Tkinter 构建，零外部依赖即可运行。
 
@@ -13,7 +13,8 @@
 ## ✨ 功能特性
 
 - 📚 **题库管理** — 导入 JSON 题库，支持创建示例题库
-- 🧩 **手工生成题库** — 在应用内逐题录入，保存为标准 JSON 题库
+- 🧩 **题库生成** — 支持手工逐题录入，也可用 AI 将资料解析为标准 JSON 题库
+- 📄 **资料导入** — 支持 TXT、Markdown、CSV、Word、Excel、PDF 文本提取
 - 🛠️ **题库编辑器** — 支持新增、复制、删除、上移、下移、模板与草稿自动保存
 - 🎯 **练习模式** — 逐题练习，即时反馈，按题型筛选，支持在线编辑
 - 📝 **考试模式** — 模拟考试，限时作答，自动评分，答题回顾
@@ -71,7 +72,8 @@ LingCe/
 │   └── utils.py            # 工具函数
 ├── services/
 │   ├── exam_service.py     # 考试业务逻辑
-│   ├── ai_service.py       # AI 复核服务
+│   ├── ai_service.py       # AI 复核与题库解析
+│   ├── document_import_service.py # 资料文本提取
 │   ├── file_service.py     # 文件导入导出
 │   ├── question_bank_builder.py # 手工题库生成
 │   ├── question_service.py # 题目管理
@@ -90,7 +92,7 @@ LingCe/
 ├── question_banks/         # 示例题库与本地生成题库
 ├── data/                   # 本地运行数据
 ├── scripts/                # 辅助脚本
-├── tests/                  # 单元测试（131 个）
+├── tests/                  # 单元测试（138 个）
 ├── pyproject.toml          # 项目配置
 └── requirements.txt        # 依赖声明
 ```
@@ -149,6 +151,7 @@ python scripts/release_check.py
 - **Python 3.7+** — 无外部运行时依赖
 - **Tkinter** — 跨平台 GUI
 - **matplotlib** — 可选，统计图表增强
+- **pypdf / PyPDF2** — 可选，PDF 文本提取增强
 - **pytest** — 开发依赖，单元测试
 
 ## 🤝 参与贡献

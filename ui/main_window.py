@@ -24,6 +24,7 @@ from ui.components import show_message_dialog, center_window
 from ui.exam_stats import show_exam_stats
 from ui.settings_window import show_settings_window
 from ui.question_bank_builder_window import show_question_bank_builder_window
+from ui.app_icon import apply_app_icon
 
 
 GITHUB_URL = "https://github.com/c0rdXy/LingCe"
@@ -90,6 +91,7 @@ class MainWindow:
     def setup_window(self):
         """设置窗口属性"""
         self.root.title(self.settings_service.get_window_title())
+        apply_app_icon(self.root)
         self.root.geometry(DEFAULT_WINDOW_SIZE)
         center_window(self.root, 1100, 750)
         self._apply_theme()

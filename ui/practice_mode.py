@@ -6,7 +6,7 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from typing import Optional, Dict, Any, Callable, List
+from typing import Optional, Dict, Any, Callable, List, Set
 from core.config import DEFAULT_FONT, BOLD_FONT, COLORS, QUESTION_TYPES, get_theme_colors
 from core.models import QuestionBank, Question
 from core.utils import format_judge_answer
@@ -49,7 +49,7 @@ class PracticeModeWindow:
         self._collected_only = False  # 是否只练习收藏题目
         self._practice_range = "all"
         self._selected_question_type = "all"
-        self._last_wrong_review_ids: set[int] = set()
+        self._last_wrong_review_ids: Set[int] = set()
         self.range_var = tk.StringVar(value=self._practice_range)
         self.ai_histories: Dict[int, list] = {}
 

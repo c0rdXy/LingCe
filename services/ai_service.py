@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from core.ai_presets import get_default_ai_settings
 from core.models import Question
 from core.utils import format_judge_answer, get_question_type_name
+from services.question_bank_builder import QuestionDraft
 from services.settings_service import SettingsService
 
 
@@ -86,6 +87,48 @@ class AIService:
         prompt = self._build_generate_answer_prompt(question)
         response = self._chat(self._build_messages(prompt, []), self.get_ai_settings())
         return self._parse_answer_json(response)
+
+    def generate_questions_from_text(
+        self,
+        source_text: str,
+        question_count: str = "auto",
+        question_types: Optional[List[str]] = None,
+        include_explanation: bool = True,
+        difficulty: str = "auto",
+    ) -> List[QuestionDraft]:
+        """将资料文本解析为题目草稿。"""
+        chunks = self._split_source_text(source_text)
+        if not chunks:
+            raise AIServiceError("请先提供可解析的资料内容")
+
+        all_drafts = []
+        for index, chunk in enumerate(chunks, start=1):
+            prompt = self._build_question_import_prompt(
+                chunk,
+                question_count,
+                question_types or [],
+                include_explanation,
+                difficulty,
+                index,
+                len(chunks),
+            )
+            response = self._chat(
+                self._build_messages(prompt, []),
+                self.get_ai_settings(),
+                max_tokens=3500,
+            )
+            all_drafts.extend(self._parse_question_drafts_with_repair(response, prompt))
+
+        unique = []
+        seen_questions = set()
+        for draft in all_drafts:
+            key = draft.question.strip()
+            if key and key not in seen_questions:
+                seen_questions.add(key)
+                unique.append(draft)
+        if not unique:
+            raise AIServiceError("AI 未生成有效题目")
+        return unique
 
     def _chat(
         self,
@@ -218,13 +261,7 @@ class AIService:
         history: Optional[List[Dict[str, str]]] = None,
     ) -> List[Dict[str, str]]:
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是 LingCe 的题库复核助手。你的任务是独立判断题目、答案和解析是否可靠。"
-                    "不要默认题库答案正确；不确定时必须说明需要人工确认。"
-                ),
-            }
+            {"role": "system", "content": self._system_prompt()}
         ]
         for item in (history or [])[-8:]:
             role = item.get("role")
@@ -257,6 +294,31 @@ class AIService:
 用户答案：{user_answer or "未提供"}
 题库解析：{question.explanation or "无"}
 """
+
+    def _parse_question_drafts_with_repair(self, response: str, original_prompt: str) -> List[QuestionDraft]:
+        """解析题库 JSON，失败时让 AI 自动修复一次格式。"""
+        try:
+            return self._parse_question_drafts_json(response)
+        except AIServiceError as first_error:
+            repair_prompt = self._build_json_repair_prompt(response)
+            try:
+                repaired = self._chat(
+                    self._build_messages(repair_prompt, [{"role": "user", "content": original_prompt}]),
+                    self.get_ai_settings(),
+                    max_tokens=3500,
+                )
+                return self._parse_question_drafts_json(repaired)
+            except AIServiceError as second_error:
+                raise AIServiceError(f"{first_error}；自动修复失败：{second_error}") from second_error
+
+    @staticmethod
+    def _system_prompt() -> str:
+        return (
+            "你是 LingCe 的题库助手。需要复核题目时，必须独立判断题目、答案和解析是否可靠，"
+            "不要默认题库答案正确；不确定时必须说明需要人工确认。"
+            "需要生成或修复题库 JSON 时，必须只输出可被 json.loads 解析的 JSON，"
+            "不要输出 Markdown 代码块、解释、前后缀或注释。"
+        )
 
     def _build_followup_prompt(self, question: Question, user_answer: str, user_message: str) -> str:
         options = "\n".join(question.options) if question.options else "无"
@@ -310,9 +372,141 @@ JSON 格式：
 {options}
 """
 
+    def _build_question_import_prompt(
+        self,
+        source_text: str,
+        question_count: str,
+        question_types: List[str],
+        include_explanation: bool,
+        difficulty: str,
+        chunk_index: int,
+        chunk_count: int,
+    ) -> str:
+        type_names = {
+            "single": "单选题",
+            "multiple": "多选题",
+            "judgement": "判断题",
+            "fill": "填空题",
+            "short": "简答题",
+        }
+        requested_types = "、".join(type_names.get(item, item) for item in question_types) or "自动选择合适题型"
+        explanation_rule = "每题都生成解析" if include_explanation else "解析可为空"
+        count_rule = "自动生成适量题目" if question_count == "auto" else f"尽量生成 {question_count} 道题"
+        difficulty_rule = {
+            "easy": "简单",
+            "normal": "普通",
+            "hard": "困难",
+        }.get(difficulty, "自动判断")
+        return f"""请把下面资料转换为 LingCe 本地题库题目。
+
+要求：
+1. 只根据资料内容出题，不要编造资料中没有依据的事实。
+2. {count_rule}，当前为第 {chunk_index}/{chunk_count} 段资料。
+3. 题型范围：{requested_types}。
+4. 难度：{difficulty_rule}。
+5. {explanation_rule}。
+6. 单选题 type 为 single，答案为一个选项字母，如 A。
+7. 多选题 type 为 multiple，答案为多个选项字母并按字母顺序排列，如 ABC。
+8. 判断题 type 为 judgement，答案只写“正确”或“错误”。
+9. 填空题 type 为 fill，简答题 type 为 short。
+10. 选择题 options 只写选项内容，不要带 A./B./C. 前缀。
+11. 只返回 JSON 数组，不要返回 Markdown，不要添加额外说明。
+12. 输出必须以 [ 开头，以 ] 结尾。
+
+JSON 数组格式：
+[
+  {{"type":"single","question":"题干","options":["选项一","选项二","选项三","选项四"],"answer":"A","explanation":"解析"}},
+  {{"type":"judgement","question":"题干","options":[],"answer":"正确","explanation":"解析"}}
+]
+
+资料内容：
+{source_text}
+"""
+
     @staticmethod
-    def _parse_answer_json(content: str) -> Dict[str, str]:
-        """解析 AI 生成的答案 JSON。"""
+    def _build_json_repair_prompt(raw_response: str) -> str:
+        return f"""下面内容本应是 LingCe 题库 JSON 数组，但格式无法解析。
+
+请把它修复为严格 JSON 数组，只返回 JSON，不要返回 Markdown，不要解释。
+
+字段要求：
+- type 只能是 single、multiple、judgement、fill、short
+- question 必须是字符串
+- options 必须是字符串数组；非选择题可为空数组
+- answer 必须是字符串
+- explanation 必须是字符串
+
+需要修复的内容：
+{raw_response}
+"""
+
+    @staticmethod
+    def _split_source_text(source_text: str, max_chars: int = 6000) -> List[str]:
+        """按段落把长文本切成适合模型处理的片段。"""
+        paragraphs = [line.strip() for line in str(source_text or "").splitlines() if line.strip()]
+        chunks = []
+        current = []
+        current_length = 0
+        for paragraph in paragraphs:
+            if current and current_length + len(paragraph) + 1 > max_chars:
+                chunks.append("\n".join(current))
+                current = []
+                current_length = 0
+            current.append(paragraph)
+            current_length += len(paragraph) + 1
+        if current:
+            chunks.append("\n".join(current))
+        return chunks
+
+    @classmethod
+    def _parse_question_drafts_json(cls, content: str) -> List[QuestionDraft]:
+        """解析 AI 返回的题目草稿 JSON。"""
+        data = cls._load_json_from_ai_response(content)
+        if isinstance(data, dict):
+            data = data.get("questions", [])
+        if not isinstance(data, list):
+            raise AIServiceError("AI 返回的题库不是 JSON 数组")
+
+        drafts = []
+        aliases = {
+            "judge": "judgement",
+            "essay": "short",
+        }
+        valid_types = {"single", "multiple", "judgement", "fill", "short"}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            qtype = aliases.get(str(item.get("type", "single")).strip(), str(item.get("type", "single")).strip())
+            if qtype not in valid_types:
+                qtype = "single"
+            raw_options = item.get("options", [])
+            if not isinstance(raw_options, list):
+                raw_options = []
+            options = [cls._strip_option_prefix(str(option)) for option in raw_options if str(option).strip()]
+            if qtype not in {"single", "multiple"}:
+                options = []
+            drafts.append(QuestionDraft(
+                type=qtype,
+                question=str(item.get("question", "")).strip(),
+                options=options,
+                answer=str(item.get("answer", "")).strip(),
+                explanation=str(item.get("explanation", "")).strip(),
+            ))
+
+        if not drafts:
+            raise AIServiceError("AI 未返回有效题目")
+        return drafts
+
+    @staticmethod
+    def _strip_option_prefix(option: str) -> str:
+        text = option.strip()
+        if len(text) >= 2 and text[0].isalpha() and text[1] in {".", "、", "．", " "}:
+            return text[2:].strip()
+        return text
+
+    @staticmethod
+    def _load_json_from_ai_response(content: str) -> Any:
+        """从 AI 响应中提取 JSON 对象或数组。"""
         text = (content or "").strip()
         if text.startswith("```"):
             lines = text.splitlines()
@@ -321,14 +515,23 @@ JSON 格式：
             if lines and lines[-1].strip().startswith("```"):
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            text = text[start:end + 1]
+        starts = [index for index in (text.find("["), text.find("{")) if index != -1]
+        if starts:
+            start = min(starts)
+            end = max(text.rfind("]"), text.rfind("}"))
+            if end > start:
+                text = text[start:end + 1]
         try:
-            data = json.loads(text)
+            return json.loads(text)
         except json.JSONDecodeError as exc:
-            raise AIServiceError("AI 返回的答案解析不是有效 JSON") from exc
+            raise AIServiceError("AI 返回内容不是有效 JSON") from exc
+
+    @staticmethod
+    def _parse_answer_json(content: str) -> Dict[str, str]:
+        """解析 AI 生成的答案 JSON。"""
+        data = AIService._load_json_from_ai_response(content)
+        if not isinstance(data, dict):
+            raise AIServiceError("AI 返回的答案解析不是有效 JSON")
         answer = str(data.get("answer", "")).strip()
         explanation = str(data.get("explanation", "")).strip()
         if not answer and not explanation:

@@ -68,6 +68,9 @@ hiddenimports = [
 # 数据文件收集
 datas = [
     ('assets/github-fluidicon.png', 'assets'),
+    ('assets/lingce-logo.png', 'assets'),
+    ('assets/lingce-logo-256.png', 'assets'),
+    ('assets/lingce-logo.ico', 'assets'),
     ('question_banks/题库.json', 'question_banks'),
 ]
 
@@ -119,6 +122,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,  # 无控制台窗口
     disable_windowed_traceback=True,  # 禁用窗口化回溯
+    icon='assets/lingce-logo.ico',
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,

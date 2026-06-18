@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">LingCe Logo</title>
+  <desc id="desc">A clean logo for LingCe, combining a checklist, document, and insight mark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="80" y1="56" x2="432" y2="456" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0EA5E9"/>
+      <stop offset="0.52" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="164" y1="118" x2="356" y2="386" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF4FF"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="#F8FBFF"/>
+  <circle cx="256" cy="256" r="208" fill="url(#bg)"/>
+  <path d="M154 130h166l58 58v190c0 24-19 43-43 43H154c-24 0-43-19-43-43V173c0-24 19-43 43-43z" fill="url(#paper)" filter="url(#softShadow)"/>
+  <path d="M320 130v55c0 12 10 22 22 22h36" fill="#CDE9FF"/>
+  <path d="M320 130l58 58h-36c-12 0-22-10-22-22v-36z" fill="#BAE0FF"/>
+
+  <path d="M175 243l34 34 77-91" fill="none" stroke="#16A34A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M178 330h146" fill="none" stroke="#2563EB" stroke-width="22" stroke-linecap="round"/>
+  <path d="M178 374h104" fill="none" stroke="#0EA5E9" stroke-width="18" stroke-linecap="round"/>
+
+  <circle cx="350" cy="328" r="52" fill="#0F172A"/>
+  <path d="M330 328l16 16 29-34" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M144 421c26 22 63 35 112 35 52 0 91-15 118-40" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" opacity="0.9"/>
+</svg>
