@@ -1,13 +1,17 @@
 {
-  "version": "0.0.8",
+  "version": "1.0.0",
   "last_file": "",
   "progress": {},
   "wrong_history": [],
+  "wrong_history_full": {},
   "favorites": [],
+  "favorites_full": {},
   "tags": {},
   "stats": {
     "total_answered": 0,
     "total_correct": 0,
-    "daily": {}
-  }
+    "daily": {},
+    "by_mode": {}
+  },
+  "last_updated": ""
 }

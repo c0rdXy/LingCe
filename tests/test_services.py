@@ -11,7 +11,6 @@ from pathlib import Path
 
 from core.models import Question, QuestionBank
 from services.exam_service import ExamService
-from services.file_service import FileService
 from services.question_service import QuestionService
 from services.question_bank_builder import QuestionBankBuilder, QuestionDraft
 from services.user_data_service import UserDataService
@@ -137,24 +136,6 @@ class TestExamService(unittest.TestCase):
         self.service.start_exam_session(question_count=10, time_limit=90)
         remaining = self.service.get_remaining_time()
         self.assertGreater(remaining, 0)
-
-
-class TestFileService(unittest.TestCase):
-    """FileService 娴嬭瘯"""
-
-    def test_validate_accepts_supported_question_types(self):
-        service = FileService()
-        data = [
-            {"type": "single", "question": "Q1", "options": ["A. X", "B. Y"], "answer": "A"},
-            {"type": "multiple", "question": "Q2", "options": ["A. X", "B. Y"], "answer": "AB"},
-            {"type": "judge", "question": "Q3", "answer": "A"},
-            {"type": "judgement", "question": "Q4", "answer": "A"},
-            {"type": "fill", "question": "Q5", "answer": "X"},
-            {"type": "short", "question": "Q6", "answer": "X"},
-            {"type": "essay", "question": "Q7", "answer": "X"},
-        ]
-
-        self.assertEqual(service.validate_question_data(data), [])
 
 
 class TestUserDataService(unittest.TestCase):
@@ -472,6 +453,21 @@ class TestSettingsService(unittest.TestCase):
 
         self.assertEqual({item["provider"] for item in keys}, {"deepseek", "kimi"})
         self.assertEqual(reloaded.get_ai_settings()["api_key"], "deepseek-key")
+
+    def test_ai_provider_model_history_is_preserved(self):
+        service = SettingsService(self.settings_file)
+        settings = service.get_settings()
+        settings["ai"]["provider_models"] = {
+            "api|deepseek": "deepseek-reasoner",
+            "api|kimi": "moonshot-v1-32k",
+        }
+        service.save_settings(settings)
+
+        reloaded = SettingsService(self.settings_file)
+        history = reloaded.get_ai_settings()["provider_models"]
+
+        self.assertEqual(history["api|deepseek"], "deepseek-reasoner")
+        self.assertEqual(history["api|kimi"], "moonshot-v1-32k")
 
 
 class TestAIService(unittest.TestCase):

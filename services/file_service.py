@@ -4,11 +4,10 @@
 文件服务模块 - 处理文件导入导出相关功能
 """
 
-import json
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Optional, Dict, Any, List
-from core.models import QuestionBank, Question
+from core.models import QuestionBank
 from core.utils import load_questions_from_file, save_questions_to_file
 from core.config import FILE_CONFIG, QUESTION_BANK_DIR
 
@@ -112,117 +111,3 @@ class FileService:
             "question_count": len(self.question_bank.questions),
             "type_distribution": self.question_bank.get_type_distribution()
         }
-    
-    def validate_question_data(self, data: List[Dict[str, Any]]) -> List[str]:
-        """验证题目数据格式"""
-        errors = []
-        
-        for i, item in enumerate(data):
-            question_num = i + 1
-            
-            # 检查必需字段
-            if 'question' not in item or not item['question'].strip():
-                errors.append(f"第{question_num}题：缺少题目内容")
-            
-            if 'type' not in item:
-                errors.append(f"第{question_num}题：缺少题目类型")
-            elif item['type'] not in ['single', 'multiple', 'judge', 'judgement', 'fill', 'short', 'essay']:
-                errors.append(f"第{question_num}题：题目类型无效")
-            
-            if 'answer' not in item or not item['answer'].strip():
-                errors.append(f"第{question_num}题：缺少答案")
-            
-            # 检查选择题选项
-            if item.get('type') in ['single', 'multiple']:
-                if 'options' not in item or not item['options']:
-                    errors.append(f"第{question_num}题：选择题缺少选项")
-                elif len(item['options']) < 2:
-                    errors.append(f"第{question_num}题：选择题选项不足")
-        
-        return errors
-    
-    def import_questions_from_json(self, file_path: str) -> Optional[QuestionBank]:
-        """从JSON文件导入题目"""
-        try:
-            with open(file_path, 'r', encoding=FILE_CONFIG["encoding"]) as f:
-                data = json.load(f)
-            
-            # 验证数据格式
-            if not isinstance(data, list):
-                raise ValueError("JSON文件格式错误：应为题目数组")
-            
-            errors = self.validate_question_data(data)
-            if errors:
-                error_msg = "数据验证失败：\n" + "\n".join(errors[:10])  # 只显示前10个错误
-                if len(errors) > 10:
-                    error_msg += f"\n... 还有 {len(errors) - 10} 个错误"
-                raise ValueError(error_msg)
-            
-            # 转换为Question对象
-            questions = []
-            for i, item in enumerate(data):
-                question = Question(
-                    id=item.get('id', i + 1),
-                    type=item['type'],
-                    question=item['question'],
-                    options=item.get('options', []),
-                    answer=item['answer'],
-                    explanation=item.get('explanation', '')
-                )
-                questions.append(question)
-            
-            return QuestionBank(questions=questions, file_path=file_path)
-            
-        except Exception as e:
-            raise Exception(f"导入失败：{str(e)}")
-    
-    def create_sample_question_file(self, file_path: str):
-        """创建示例题目文件"""
-        sample_questions = [
-            {
-                "id": 1,
-                "type": "single",
-                "question": "以下哪个选项是通用的考试练习模式？",
-                "options": ["A. 练习模式", "B. 考试模式", "C. 错题复习", "D. 以上都是"],
-                "answer": "D",
-                "explanation": "灵测支持练习模式、考试模式、错题复习等多种学习方式。"
-            },
-            {
-                "id": 2,
-                "type": "multiple",
-                "question": "以下哪些是灵测支持的功能？",
-                "options": ["A. 练习模式", "B. 考试模式", "C. 错题集", "D. 统计图表"],
-                "answer": "ABCD",
-                "explanation": "灵测支持练习模式、考试模式、错题集管理、统计图表等功能。"
-            },
-            {
-                "id": 3,
-                "type": "judgement",
-                "question": "灵测支持单选、多选、判断、填空、简答等多种题型。",
-                "options": ["A. 正确", "B. 错误"],
-                "answer": "A",
-                "explanation": "灵测支持单选、多选、判断、填空、简答等多种题型，覆盖常见考试场景。"
-            },
-            {
-                "id": 4,
-                "type": "fill",
-                "question": "灵测的项目英文名是：______。",
-                "options": [],
-                "answer": "LingCe",
-                "explanation": "灵测的英文名称为 LingCe，取自「灵」（灵活）和「测」（测试）的组合。"
-            },
-            {
-                "id": 5,
-                "type": "short",
-                "question": "请简述灵测的主要功能。",
-                "options": [],
-                "answer": "灵测主要功能包括：题库管理、练习模式、考试模式、错题集管理、学习统计等，支持导入自定义题库。",
-                "explanation": "灵测是一个通用的考试练习系统，适用于各类考试场景。"
-            }
-        ]
-        
-        try:
-            with open(file_path, 'w', encoding=FILE_CONFIG["encoding"]) as f:
-                json.dump(sample_questions, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            raise Exception(f"创建示例文件失败：{str(e)}")

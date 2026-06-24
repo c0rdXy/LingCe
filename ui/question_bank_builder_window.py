@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""手工创建题库窗口。"""
+"""题库生成窗口。"""
 
 import threading
 import tkinter as tk
@@ -36,12 +36,12 @@ def show_question_bank_builder_window(
     parent: tk.Tk,
     on_saved: Optional[Callable[[str], None]] = None,
 ):
-    """显示手工创建题库窗口。"""
+    """显示题库生成窗口。"""
     QuestionBankBuilderWindow(parent, on_saved)
 
 
 class QuestionBankBuilderWindow:
-    """手工创建题库编辑器。"""
+    """题库生成与编辑窗口。"""
 
     def __init__(self, parent: tk.Tk, on_saved: Optional[Callable[[str], None]] = None):
         self.parent = parent
@@ -206,7 +206,7 @@ class QuestionBankBuilderWindow:
         self.ai_import_btn.pack(side="right")
 
     def focus_manual_tab(self):
-        """占位按钮保留用户从导入页回到编辑页的直觉入口。"""
+        """切回手工编辑页。"""
         for widget in self.window.winfo_children():
             if isinstance(widget, ttk.Notebook):
                 widget.select(0)

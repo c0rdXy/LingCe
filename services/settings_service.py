@@ -270,6 +270,7 @@ class SettingsService:
         normalized["provider_name"] = str(normalized.get("provider_name") or "")
         normalized["base_url"] = str(normalized.get("base_url") or "").strip()
         normalized["model"] = str(normalized.get("model") or "").strip()
+        normalized["provider_models"] = self._normalize_ai_provider_models(normalized.get("provider_models", {}))
         normalized["api_keys"] = self._normalize_ai_key_entries(normalized)
         selected_key_id = str(normalized.get("selected_key_id") or "")
         if not selected_key_id and normalized["api_keys"]:
@@ -280,6 +281,17 @@ class SettingsService:
         normalized["max_tokens"] = max(1, _to_int(normalized.get("max_tokens"), 2000))
         normalized["temperature"] = max(0.0, _to_float(normalized.get("temperature"), 0.2))
         return normalized
+
+    @staticmethod
+    def _normalize_ai_provider_models(models: Any) -> Dict[str, str]:
+        """规范化按接入方式和服务商保存的模型历史。"""
+        if not isinstance(models, dict):
+            return {}
+        return {
+            str(key): str(value).strip()
+            for key, value in models.items()
+            if str(key).strip() and str(value).strip()
+        }
 
     def _normalize_ai_key_entries(self, settings: Dict[str, Any]) -> List[Dict[str, str]]:
         """规范化 AI Key 列表，并兼容旧版单 Key 字段。"""

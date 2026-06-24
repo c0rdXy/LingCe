@@ -77,6 +77,7 @@ class SettingsWindow:
         self.ai_base_url_var = tk.StringVar(value=ai.get("base_url", ""))
         self.ai_key_var = tk.StringVar(value=ai.get("api_key", ""))
         self.ai_key_entries = [dict(item) for item in ai.get("api_keys", [])]
+        self.ai_model_history = dict(ai.get("provider_models", {}))
         self.ai_selected_key_id = ai.get("selected_key_id", "")
         self.ai_key_select_var = tk.StringVar()
         self.ai_key_count_var = tk.StringVar(value="当前厂商已保存 Key：0 个")
@@ -402,6 +403,7 @@ class SettingsWindow:
         access_mode = mode_key_from_name(self.ai_access_mode_var.get())
         provider_id = provider_id_from_name(access_mode, self.ai_provider_var.get())
         self._sync_current_key_entry()
+        self._sync_current_model()
         current_key = self._find_key_entry(self.ai_selected_key_id)
         return {
             "enabled": self.ai_enabled_var.get(),
@@ -412,6 +414,7 @@ class SettingsWindow:
             "model": self.ai_model_var.get().strip(),
             "api_key": current_key.get("value", "") if current_key else self.ai_key_var.get(),
             "api_keys": self.ai_key_entries,
+            "provider_models": self.ai_model_history,
             "selected_key_id": self.ai_selected_key_id,
             "timeout": self.ai_timeout_var.get() or "60",
             "temperature": self.ai_temperature_var.get() or "0.2",
@@ -422,12 +425,14 @@ class SettingsWindow:
         if self._syncing_ai_controls:
             return
         self._sync_current_key_entry(self._ai_key_context_meta)
+        self._sync_current_model(self._ai_key_context_meta)
         self._refresh_ai_provider_options(keep_current=False)
 
     def _on_ai_provider_changed(self, _event=None):
         if self._syncing_ai_controls:
             return
         self._sync_current_key_entry(self._ai_key_context_meta)
+        self._sync_current_model(self._ai_key_context_meta)
         self._apply_ai_provider_preset()
 
     def _refresh_ai_provider_options(self, keep_current: bool):
@@ -451,10 +456,15 @@ class SettingsWindow:
         self.ai_base_url_var.set(provider.get("base_url", ""))
         models = provider.get("models", [])
         self.ai_model_box.configure(values=models)
-        if keep_model and self.ai_model_var.get() in models:
-            pass
-        elif models:
-            self.ai_model_var.set(models[0])
+        current_model = self.ai_model_var.get().strip()
+        saved_model = self._get_saved_provider_model()
+        if keep_model and current_model:
+            if current_model not in models:
+                self.ai_model_box.configure(values=[current_model, *models])
+        elif saved_model:
+            values = models if saved_model in models else [saved_model, *models]
+            self.ai_model_box.configure(values=values)
+            self.ai_model_var.set(saved_model)
         else:
             self.ai_model_var.set("")
         self._syncing_ai_controls = False
@@ -565,6 +575,21 @@ class SettingsWindow:
             "provider": provider_id,
             "provider_name": self.ai_provider_var.get(),
         }
+
+    @staticmethod
+    def _provider_model_key(meta: Dict[str, str]) -> str:
+        return f"{meta.get('access_mode', 'api')}|{meta.get('provider', '')}"
+
+    def _sync_current_model(self, meta: Dict[str, str] = None):
+        """记住当前接入方式和服务商下最后使用的模型。"""
+        meta = meta or self._current_provider_key_meta()
+        model = self.ai_model_var.get().strip()
+        if model and model != "正在获取...":
+            self.ai_model_history[self._provider_model_key(meta)] = model
+
+    def _get_saved_provider_model(self) -> str:
+        """读取当前接入方式和服务商下上次使用的模型。"""
+        return self.ai_model_history.get(self._provider_model_key(self._current_provider_key_meta()), "")
 
     def _is_current_provider_key(self, item: Dict[str, str]) -> bool:
         meta = self._current_provider_key_meta()
