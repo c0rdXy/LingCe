@@ -12,7 +12,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "version": "1.0.0",
     "app": {
         "name": "灵测 LingCe",
-        "subtitle": "通用考试练习平台",
+        "subtitle": "灵测通用考试练习平台",
         "show_version": True,
         "default_theme": "light",
     },

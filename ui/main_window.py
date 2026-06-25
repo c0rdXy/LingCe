@@ -11,10 +11,10 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any
 from core.config import (
-    DEFAULT_WINDOW_SIZE, get_font,
+    get_font,
     DEFAULT_FONT, BOLD_FONT, TITLE_FONT, COLORS,
     get_theme, set_theme, get_theme_colors, THEMES,
-    DEFAULT_QUESTION_BANK_PATH,
+    DEFAULT_QUESTION_BANK_PATH, APP_VERSION,
 )
 from services.file_service import FileService
 from services.user_data_service import UserDataService
@@ -92,9 +92,13 @@ class MainWindow:
         """设置窗口属性"""
         self.root.title(self.settings_service.get_window_title())
         apply_app_icon(self.root)
-        self.root.geometry(DEFAULT_WINDOW_SIZE)
+        self._set_min_window_size()
         center_window(self.root, 1100, 750)
         self._apply_theme()
+
+    def _set_min_window_size(self):
+        """设置最小窗口尺寸，实际尺寸交给启动居中逻辑和用户调整。"""
+        self.root.minsize(1100, 750)
 
     def _apply_theme(self):
         """应用当前主题到窗口"""
@@ -149,6 +153,7 @@ class MainWindow:
     # ------------------------------------------------------------------ #
 
     def create_main_interface(self):
+        self._set_min_window_size()
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -320,7 +325,7 @@ class MainWindow:
     def _create_title(self, parent, tc):
         frame = tk.Frame(parent, bg=tc["bg"])
         frame.pack(fill="x", pady=(0, 30))
-        tk.Label(frame, text=self.settings_service.get_window_title(), font=TITLE_FONT,
+        tk.Label(frame, text=self.settings_service.get_app_name(), font=TITLE_FONT,
                  bg=tc["bg"], fg=tc["primary"]).pack()
         tk.Label(frame, text=self.settings_service.get_app_subtitle(),
                  font=DEFAULT_FONT, bg=tc["bg"], fg=tc["text_secondary"]).pack(pady=(5, 0))
@@ -400,6 +405,15 @@ class MainWindow:
                       bg=tc["header_bg"], fg=tc["header_fg"],
                       relief="flat", command=cmd, cursor="hand2",
                       ).pack(side="left", padx=15)
+
+        if self.settings_service.should_show_version():
+            tk.Label(
+                footer,
+                text=APP_VERSION,
+                font=get_font(9),
+                bg=tc["header_bg"],
+                fg=tc["header_fg"],
+            ).place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
     def _toggle_theme(self):
         current = get_theme()
@@ -482,11 +496,13 @@ class MainWindow:
 
     def start_practice_mode(self):
         if self.on_practice_mode:
+            self._set_min_window_size()
             self.current_mode = "practice"
             self.on_practice_mode(self.file_service.question_bank)
 
     def start_exam_mode(self):
         if self.on_exam_mode:
+            self._set_min_window_size()
             self.current_mode = "exam"
             self.on_exam_mode(self.file_service.question_bank)
 
@@ -639,6 +655,7 @@ class MainWindow:
     # ------------------------------------------------------------------ #
 
     def return_to_main(self):
+        self._set_min_window_size()
         self.root.title(self.settings_service.get_window_title())
         self.current_mode = None
         self.create_main_interface()

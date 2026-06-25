@@ -133,7 +133,7 @@ class SettingsWindow:
         )
         theme_box.grid(row=2, column=1, sticky="w", pady=8)
 
-        ttk.Checkbutton(form, text="窗口标题显示版本号",
+        ttk.Checkbutton(form, text="首页右下角显示版本号",
                         variable=self.show_version_var).grid(
             row=3, column=1, sticky="w", pady=8
         )

@@ -309,7 +309,7 @@ class TestSettingsService(unittest.TestCase):
             f.write("{invalid json")
 
         service = SettingsService(self.settings_file)
-        self.assertEqual(service.get_app_subtitle(), "通用考试练习平台")
+        self.assertEqual(service.get_app_subtitle(), "灵测通用考试练习平台")
 
     def test_validation_rejects_empty_app_name(self):
         service = SettingsService(self.settings_file)

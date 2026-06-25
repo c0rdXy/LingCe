@@ -128,6 +128,7 @@ class ExamModeWindow:
 
     def create_exam_interface(self):
         tc = get_theme_colors()
+        self.root.minsize(1100, 750)
         for widget in self.root.winfo_children():
             widget.destroy()
 

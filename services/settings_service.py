@@ -10,7 +10,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from core.config import APP_VERSION
 from core.ai_presets import get_default_ai_settings
 from core.default_settings import get_default_settings, merge_with_defaults
 
@@ -87,17 +86,18 @@ class SettingsService:
 
     def get_app_subtitle(self) -> str:
         """返回首页副标题。"""
-        return self._settings.get("app", {}).get("subtitle", "通用考试练习平台")
+        return self._settings.get("app", {}).get("subtitle", "灵测通用考试练习平台")
 
     def get_window_title(self, suffix: str = "") -> str:
         """返回窗口标题。"""
-        app = self._settings.get("app", {})
         title = self.get_app_name()
-        if app.get("show_version", True):
-            title = f"{title} {APP_VERSION}"
         if suffix:
             title = f"{title} - {suffix}"
         return title
+
+    def should_show_version(self) -> bool:
+        """首页是否显示版本号。"""
+        return bool(self._settings.get("app", {}).get("show_version", True))
 
     def get_question_type_name(self, type_key: str) -> str:
         """返回配置中的题型显示名。"""

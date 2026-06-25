@@ -1,8 +1,12 @@
-# 灵测 LingCe
+<h1 align="center">灵测 LingCe</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-138%20passed-success.svg)](tests/)
+<p align="center">灵测通用考试练习平台</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="pyproject.toml"><img alt="Python 3.7+" src="https://img.shields.io/badge/Python-3.7%2B-brightgreen.svg"></a>
+  <a href="tests/"><img alt="Tests" src="https://img.shields.io/badge/Tests-138%20passed-success.svg"></a>
+</p>
 
 灵测是一个本地优先的考试练习工具，使用 Python 和 Tkinter 构建。题库、练习记录、错题、收藏和考试历史默认都保存在本机；AI 相关能力是可选功能，只有在用户配置接口后才会发起网络请求。
 

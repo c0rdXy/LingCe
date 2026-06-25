@@ -60,6 +60,7 @@ class PracticeModeWindow:
     def create_practice_interface(self):
         """创建练习界面"""
         tc = get_theme_colors()
+        self.root.minsize(1100, 750)
         # 设置窗口标题
         self.root.title(self.settings_service.get_window_title("练习模式"))
         self.root.configure(bg=tc["bg"])
